@@ -1,10 +1,9 @@
 import { signInAnonymously } from 'firebase/auth'
 import { auth } from './firebase'
-import { decompressPayload } from './compression'
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://vegaslearning.com'
 
-async function getToken(): Promise<string | null> {
+async function getToken(): Promise<string> {
   let user = auth.currentUser
   if (!user) {
     const cred = await signInAnonymously(auth)
@@ -13,16 +12,20 @@ async function getToken(): Promise<string | null> {
   return user.getIdToken()
 }
 
+export type DispatchResult =
+  | { title: 'successful'; actionPayload: string }
+  | { title: string; actionPayload?: undefined }
+
 export async function asyncDispatch(
   actionData: Record<string, unknown>
-): Promise<{ title: string; data: unknown }> {
+): Promise<DispatchResult> {
   try {
     const token = await getToken()
     const res = await fetch(`${API_BASE}/api/common/dispatch`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify(actionData),
     })
@@ -30,17 +33,19 @@ export async function asyncDispatch(
     const json = await res.json()
 
     if (json?.title !== 'successful') {
-      return { title: json?.title ?? 'Error', data: json?.data ?? '' }
+      return { title: json?.title ?? 'Error' }
+    }
+    if (json?.data?.status !== 200) {
+      return { title: 'Server error' }
     }
 
-    const actionPayload = json?.data?.data?.actionPayload
+    const actionPayload: string = json?.data?.data?.actionPayload
     if (!actionPayload) {
-      return { title: json.title, data: json.data }
+      return { title: 'Empty response' }
     }
 
-    const data = decompressPayload(actionPayload)
-    return { title: 'successful', data }
+    return { title: 'successful', actionPayload }
   } catch (err) {
-    return { title: 'Network error', data: String(err) }
+    return { title: 'Network error' }
   }
 }
