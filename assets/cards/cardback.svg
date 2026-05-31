@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   class="card"
+   face="1B"
+   height="3.5in"
+   preserveAspectRatio="none"
+   viewBox="-120 -168 240 336"
+   width="2.5in"
+   version="1.1"
+   id="svg11"
+   sodipodi:docname="cardback.svg"
+   inkscape:version="1.2 (dc2aeda, 2022-05-15)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview13"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="in"
+     showgrid="false"
+     inkscape:zoom="2.6101191"
+     inkscape:cx="97.888254"
+     inkscape:cy="161.48689"
+     inkscape:window-width="1390"
+     inkscape:window-height="1027"
+     inkscape:window-x="43"
+     inkscape:window-y="25"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="svg11" />
+  <defs
+     id="defs5">
+    <pattern
+       inkscape:collect="always"
+       xlink:href="#B1"
+       id="pattern1299"
+       patternTransform="matrix(3.1448067,0,0,4.7221134,0.76625536,-0.31739305)" />
+    <pattern
+       id="B1"
+       width="6"
+       height="6"
+       patternUnits="userSpaceOnUse">
+      <path
+         d="M3 0L6 3L3 6L0 3Z"
+         fill="black"
+         id="path2"
+         style="fill-opacity:1.0;fill:#ffad00" />
+    </pattern>
+  </defs>
+  <rect
+     width="239"
+     height="335"
+     x="-119.5"
+     y="-167.5"
+     rx="23.920033"
+     ry="29.33823"
+     fill="white"
+     stroke="black"
+     id="rect7"
+     style="fill:#ffffff;fill-opacity:1;stroke:#ffad00;stroke-opacity:1" />
+  <rect
+     fill="url(#B1)"
+     width="214.4675"
+     height="307.4025"
+     x="-106.46751"
+     y="-154.01862"
+     rx="18.370565"
+     ry="17.695364"
+     id="rect9"
+     style="fill:url(#pattern1299);stroke-width:0.989078" />
+</svg>
