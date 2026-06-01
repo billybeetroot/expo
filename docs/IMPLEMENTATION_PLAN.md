@@ -6,12 +6,38 @@
 
 ---
 
+## Status (as of 2026-05-31)
+
+| Phase | Status | Tests | Notes |
+|---|---|---|---|
+| 0 — API layer fix | ✅ Complete | 7 suites | Per-action decode contract corrected |
+| 1 — Card logic & assets | ✅ Complete | 10 suites | 59 PNGs, cardDeck, parseInputHand, cardImageMap |
+| 2 — Card UI components | ✅ Complete | 13 suites | CardKeyboard, HandDisplay, EvTable |
+| 3 — Live Play vertical | ✅ Complete | 15 suites / 268 tests | Screens wired, running on iOS 26.5 simulator |
+| 4 — Authentication | 🔲 Next | — | — |
+| 5 — Training (FG) | 🔲 | — | — |
+| 6 — Game Configuration | 🔲 | — | — |
+| 7 — Voice | 🔲 | — | — |
+| 8 — Account / Payments | 🔲 | — | — |
+| 9 — Polish | 🔲 | — | — |
+
+**Known issues to fix before Phase 9:**
+- Firebase auth persistence warning — add `initializeAuth` + AsyncStorage persistence (Phase 4)
+- `SafeAreaView` from `react-native` deprecated — switch to `react-native-safe-area-context`
+- NativeWind metro transformer disabled — needs `react-native-reanimated` to re-enable
+- Simulator network error on DEAL — expected in simulator without VPN/tunnel; test on device
+
+---
+
 ## 1. Context & Current State
 
-The scaffold (committed) already has: Expo Router + 3 tabs (placeholders), NativeWind,
-three Zustand stores, Firebase init, `lib/dispatch.ts` + `lib/compression.ts`,
-`lib/gamblerAlert.ts`, the three voice utils, and a **jest-expo harness with 182 passing
-tests**. This plan covers everything from here to a working app.
+The scaffold (committed) has: Expo Router + 3 tabs, three Zustand stores, Firebase init,
+full API layer (`dispatch`, `decode`, `compression`, `gamblerAlert`), card logic
+(`cardDeck`, `parseInputHand`, `cardImageMap`, `gameIcons`), card UI components
+(`CardKeyboard`, `HandDisplay`, `CardImage`, `EvTable`), game logic (`buildCheckRequest`,
+`applyCheckResult`), Live Play screens (entry + results), and **268 passing tests**.
+Tailwind CSS downgraded to v3 (NativeWind v4 requirement). Firebase init simplified to
+`getAuth()` (Metro could not resolve `firebase/auth/react-native` subpath).
 
 **Build philosophy:** This is a *behavioural port*, not a UI port. The np2 web components
 are MUI/Tailwind/DOM and cannot be copied. What ports cleanly is **pure logic** (parsers,
