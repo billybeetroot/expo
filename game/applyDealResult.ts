@@ -17,6 +17,8 @@ export interface DealResultState {
   cardHoldText: string[]
   dealText: 'DRAW'
   evSelectedCardPositions: number[]
+  displayPaytable: string[]
+  paytable: any[]
 }
 
 export function applyDealResult(raw: any): DealResultState {
@@ -54,5 +56,7 @@ export function applyDealResult(raw: any): DealResultState {
     cardHoldText,
     dealText: 'DRAW',
     evSelectedCardPositions: holdCardPositions,
+    displayPaytable: raw.displayPaytable ?? [],
+    paytable: raw.paytable ?? [],
   }
 }

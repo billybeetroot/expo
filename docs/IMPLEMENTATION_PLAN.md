@@ -6,23 +6,35 @@
 
 ---
 
-## Status (as of 2026-05-31)
+## Status (as of 2026-06-02)
 
 | Phase | Status | Tests | Notes |
 |---|---|---|---|
 | 0 — API layer fix | ✅ Complete | 7 suites | Per-action decode contract corrected |
 | 1 — Card logic & assets | ✅ Complete | 10 suites | 59 PNGs, cardDeck, parseInputHand, cardImageMap |
 | 2 — Card UI components | ✅ Complete | 13 suites | CardKeyboard, HandDisplay, EvTable |
-| 3 — Live Play vertical | ✅ Complete | 15 suites / 268 tests | Screens wired, running on iOS 26.5 simulator |
-| 4 — Authentication | 🔲 Next | — | — |
-| 5 — Training (FG) | 🔲 | — | — |
-| 6 — Game Configuration | 🔲 | — | — |
+| 3 — Live Play vertical | ✅ Complete | 15 suites / 268 tests | Running on iOS 26.5 simulator vs local Django |
+| 4 — Authentication | ✅ Complete | 17 suites / 283 tests | signUp/signIn/logout, auth screens, account tab |
+| 5 — Training (FG) | ✅ Complete | 20 suites / 314 tests | Full DEAL→hold→DRAW loop, paytable, EV table |
+| 6 — Game Configuration | 🔲 Next | — | — |
 | 7 — Voice | 🔲 | — | — |
 | 8 — Account / Payments | 🔲 | — | — |
 | 9 — Polish | 🔲 | — | — |
 
 **Known issues to fix before Phase 9:**
-- Firebase auth persistence warning — add `initializeAuth` + AsyncStorage persistence (Phase 4)
+- Firebase auth persistence warning — add `initializeAuth` + AsyncStorage persistence
+- `SafeAreaView` from `react-native` deprecated — switch to `react-native-safe-area-context`
+- NativeWind metro transformer disabled — needs `react-native-reanimated` to re-enable
+- `USE_LOCAL_BACKEND = true` in `lib/dispatch.ts` — must be set to `false` before production build
+
+**Completed this session (2026-06-02):**
+- Phase 4: authApi.ts, firebaseAuthErrors.ts, login/signup/forgot screens, account tab auth state
+- Phase 5: applyDealResult, applyDrawResult, formatHoldMessage (31 tests); training screen with
+  DEAL→hold→DRAW loop, Hand Assist EV toggle, hold outcome banner, paytable with winning row
+  highlight, card notation boxes (A♣ K♦…) below cards, setup dispatch on mount
+- Style: dark teal theme, AppHeader, CardKeyboard circular keys, StrategyLine light blue
+- Fixes: CardKeyboard raw input buffer (useRef, normalised output); direct Django dispatch
+  (no np2 envelope); pre-warm anonymous Firebase auth; HOLD→HELD tap logic
 - `SafeAreaView` from `react-native` deprecated — switch to `react-native-safe-area-context`
 - NativeWind metro transformer disabled — needs `react-native-reanimated` to re-enable
 - Simulator network error on DEAL — expected in simulator without VPN/tunnel; test on device
