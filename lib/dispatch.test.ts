@@ -21,14 +21,12 @@ describe('asyncDispatch', () => {
     mockFetch.mockReset()
   })
 
-  it('returns actionPayload and title on success (status 200)', async () => {
-    const actionPayload = '{"hand":["Ac","Kd"]}'
+  it('returns actionPayload for check (base64 string from Django)', async () => {
+    const actionPayload = 'base64encodedpayload=='
 
     mockFetch.mockResolvedValueOnce({
-      json: async () => ({
-        title: 'successful',
-        data: { status: 200, data: { actionPayload } },
-      }),
+      ok: true,
+      json: async () => actionPayload,
     })
 
     const { asyncDispatch } = require('./dispatch')
@@ -44,30 +42,33 @@ describe('asyncDispatch', () => {
     expect(result.actionPayload).toBe(actionPayload)
   })
 
-  it('returns error when title is not successful', async () => {
+  it('returns actionPayload for setup/deal/draw (JSON object from Django)', async () => {
+    const obj = { gameState: 'New Game', hand: ['Ac', 'Kd', 'Th', 'Jh', '2s'] }
+
     mockFetch.mockResolvedValueOnce({
-      json: async () => ({ title: 'Auth error', data: { status: 403 } }),
-    })
-
-    const { asyncDispatch } = require('./dispatch')
-    const result = await asyncDispatch({ name: 'check' })
-
-    expect(result.title).toBe('Auth error')
-    expect(result.actionPayload).toBeUndefined()
-  })
-
-  it('returns error when status is not 200', async () => {
-    mockFetch.mockResolvedValueOnce({
-      json: async () => ({
-        title: 'successful',
-        data: { status: 500, data: {} },
-      }),
+      ok: true,
+      json: async () => obj,
     })
 
     const { asyncDispatch } = require('./dispatch')
     const result = await asyncDispatch({ name: 'setup', pt: 'Bonus_6_5' })
 
-    expect(result.title).not.toBe('successful')
+    expect(result.title).toBe('successful')
+    expect(result.actionPayload).toBe(JSON.stringify(obj))
+  })
+
+  it('returns HTTP error title on non-ok response', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: async () => ({}),
+    })
+
+    const { asyncDispatch } = require('./dispatch')
+    const result = await asyncDispatch({ name: 'check' })
+
+    expect(result.title).toBe('HTTP 500')
+    expect(result.actionPayload).toBeUndefined()
   })
 
   it('returns Network error on fetch failure', async () => {
@@ -81,12 +82,9 @@ describe('asyncDispatch', () => {
   })
 
   it('sends Authorization header with Firebase token', async () => {
-    const actionPayload = '{"gameState":"After Deal"}'
     mockFetch.mockResolvedValueOnce({
-      json: async () => ({
-        title: 'successful',
-        data: { status: 200, data: { actionPayload } },
-      }),
+      ok: true,
+      json: async () => ({}),
     })
 
     const { asyncDispatch } = require('./dispatch')
@@ -105,10 +103,8 @@ describe('asyncDispatch', () => {
       }),
     }))
     mockFetch.mockResolvedValueOnce({
-      json: async () => ({
-        title: 'successful',
-        data: { status: 200, data: { actionPayload: '{}' } },
-      }),
+      ok: true,
+      json: async () => ({}),
     })
 
     const { asyncDispatch } = require('./dispatch')

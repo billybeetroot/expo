@@ -148,7 +148,7 @@ export default function LivePlayScreen() {
           style={[styles.dealButton, isDealOff && styles.dealButtonDisabled]}
           accessibilityLabel="Deal"
         >
-          <Text style={styles.dealText}>DEAL</Text>
+          <Text style={styles.dealText}>{isDealOff ? '...' : 'DEAL'}</Text>
         </Pressable>
       </View>
 

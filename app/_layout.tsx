@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import { onAuthStateChanged } from 'firebase/auth'
+import { onAuthStateChanged, signInAnonymously } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { useAppStore } from '@/stores/appStore'
 
@@ -18,6 +18,11 @@ export default function RootLayout() {
         setLoggedIn(false)
         setUserEmail('')
         setUserName('')
+        // Pre-warm anonymous auth so the Firebase token is ready before first DEAL.
+        // Avoids the "Token used too early" clock-skew delay in Django on first dispatch.
+        if (!user) {
+          signInAnonymously(auth).catch(() => {})
+        }
       }
     })
     return unsub

@@ -1,7 +1,10 @@
 import { signInAnonymously } from 'firebase/auth'
 import { auth } from './firebase'
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://vegaslearning.com'
+const USE_LOCAL_BACKEND = true // set false to point at vegaslearning.com
+const API_URL = USE_LOCAL_BACKEND
+  ? 'http://localhost:8000/api/'
+  : `${process.env.EXPO_PUBLIC_API_URL ?? 'https://vegaslearning.com'}/api/`
 
 async function getToken(): Promise<string> {
   let user = auth.currentUser
@@ -21,7 +24,7 @@ export async function asyncDispatch(
 ): Promise<DispatchResult> {
   try {
     const token = await getToken()
-    const res = await fetch(`${API_BASE}/api/common/dispatch`, {
+    const res = await fetch(API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -30,17 +33,21 @@ export async function asyncDispatch(
       body: JSON.stringify(actionData),
     })
 
-    const json = await res.json()
-
-    if (json?.title !== 'successful') {
-      return { title: json?.title ?? 'Error' }
-    }
-    if (json?.data?.status !== 200) {
-      return { title: 'Server error' }
+    if (!res.ok) {
+      return { title: `HTTP ${res.status}` }
     }
 
-    const actionPayload: string = json?.data?.data?.actionPayload
-    if (!actionPayload) {
+    const raw = await res.json()
+
+    // Django returns the payload directly — no np2 envelope:
+    //   'check'              → base64+zlib compressed string
+    //   'setup'/'deal'/'draw' → plain JSON object
+    let actionPayload: string
+    if (typeof raw === 'string') {
+      actionPayload = raw
+    } else if (raw !== null && typeof raw === 'object') {
+      actionPayload = JSON.stringify(raw)
+    } else {
       return { title: 'Empty response' }
     }
 
