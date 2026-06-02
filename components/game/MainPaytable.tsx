@@ -1,5 +1,6 @@
 import React from 'react'
 import { View, Text, ScrollView, StyleSheet } from 'react-native'
+import { Colors } from '@/constants/colors'
 
 interface MainPaytableProps {
   displayPaytable: string[]
@@ -26,20 +27,20 @@ export default function MainPaytable({ displayPaytable, displayName }: MainPayta
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0A0A0A',
+    backgroundColor: Colors.bgMain,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
   title: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#E87722',
+    color: Colors.orange,
     textAlign: 'center',
     marginBottom: 4,
   },
   row: {
     fontSize: 12,
-    color: '#E0E0E0',
+    color: Colors.textLight,
     fontFamily: 'monospace',
     paddingVertical: 2,
   },

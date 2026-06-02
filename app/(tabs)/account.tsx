@@ -1,10 +1,30 @@
-import { View, Text } from 'react-native'
+import { View, Text, StyleSheet } from 'react-native'
+import { Colors } from '@/constants/colors'
 
 export default function AccountScreen() {
   return (
-    <View className="flex-1 bg-background items-center justify-center">
-      <Text className="text-defaultText text-xl font-bold">Account</Text>
-      <Text className="text-defaultText text-sm mt-2">Coming soon</Text>
+    <View style={styles.screen}>
+      <Text style={styles.title}>Account</Text>
+      <Text style={styles.sub}>Coming soon</Text>
     </View>
   )
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: Colors.bgMain,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: Colors.white,
+  },
+  sub: {
+    fontSize: 14,
+    color: Colors.textMuted,
+    marginTop: 8,
+  },
+})

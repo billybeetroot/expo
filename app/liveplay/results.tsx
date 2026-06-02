@@ -15,6 +15,8 @@ import HandDisplay from '@/components/cards/HandDisplay'
 import EvTable from '@/components/ev/EvTable'
 import StrategyLine from '@/components/game/StrategyLine'
 import MainPaytable from '@/components/game/MainPaytable'
+import AppHeader from '@/components/ui/AppHeader'
+import { Colors } from '@/constants/colors'
 
 function holdPositionsToChips(positions: number[]) {
   const cardHoldText = [' ', ' ', ' ', ' ', ' ']
@@ -78,7 +80,6 @@ export default function ResultsScreen() {
   }
 
   const handleNextHand = () => {
-    // Reset all LP state
     setDisplayHand('')
     setDisplayProb(false)
     setEvs([])
@@ -103,23 +104,30 @@ export default function ResultsScreen() {
 
   return (
     <SafeAreaView style={styles.screen}>
+      <AppHeader onBack={() => router.back()} />
+
       <StrategyLine text={strategyPrintLine || 'RESULTS'} />
 
-      <HandDisplay
-        app="LP Results"
-        noSpacesHand={noSpacesHand}
-        cardHoldText={cardHoldText}
-        cardHoldCss={cardHoldCss}
-      />
+      <View style={styles.cardArea}>
+        <HandDisplay
+          app="LP Results"
+          noSpacesHand={noSpacesHand}
+          cardHoldText={cardHoldText}
+          cardHoldCss={cardHoldCss}
+        />
+      </View>
 
+      {/* Control row */}
       <View style={styles.controlRow}>
-        <Pressable
-          onPress={() => setShowPaytable((v) => !v)}
-          style={styles.iconButton}
-          accessibilityLabel="Toggle paytable"
-        >
-          <Text style={styles.iconText}>{showPaytable ? '📊' : '📺'}</Text>
-        </Pressable>
+        <View style={styles.controlLeft}>
+          <Pressable
+            onPress={() => setShowPaytable((v) => !v)}
+            style={styles.monitorBtn}
+            accessibilityLabel="Toggle paytable"
+          >
+            <View style={styles.monitorScreen} />
+          </Pressable>
+        </View>
 
         <Pressable
           onPress={() => setWhyOpen(true)}
@@ -172,44 +180,63 @@ export default function ResultsScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#0A0A0A',
+    backgroundColor: Colors.bgMain,
+  },
+  cardArea: {
+    backgroundColor: Colors.bgMain,
+    paddingVertical: 6,
   },
   controlRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     paddingVertical: 8,
+    backgroundColor: Colors.bgMain,
   },
-  iconButton: {
-    padding: 8,
+  controlLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  iconText: {
-    fontSize: 22,
-    color: '#E87722',
+  monitorBtn: {
+    width: 44,
+    height: 34,
+    borderWidth: 2,
+    borderColor: Colors.orange,
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 4,
+  },
+  monitorScreen: {
+    width: '80%',
+    height: '60%',
+    borderWidth: 1,
+    borderColor: Colors.orange,
+    borderRadius: 1,
   },
   whyButton: {
-    borderWidth: 1,
-    borderColor: '#E87722',
+    borderWidth: 1.5,
+    borderColor: Colors.orange,
     borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
   },
   whyText: {
     fontSize: 13,
-    color: '#E87722',
-    fontWeight: '600',
+    color: Colors.orange,
+    fontWeight: '700',
   },
   nextButton: {
-    backgroundColor: '#E87722',
-    borderRadius: 12,
-    paddingHorizontal: 20,
+    backgroundColor: Colors.orange,
+    borderRadius: 10,
+    paddingHorizontal: 22,
     paddingVertical: 10,
   },
   nextText: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#fff',
+    color: Colors.white,
   },
   flex: {
     flex: 1,
@@ -220,34 +247,36 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalCard: {
-    backgroundColor: '#1A1A2E',
+    backgroundColor: Colors.bgMain,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
+    borderTopWidth: 2,
+    borderTopColor: Colors.orange,
     padding: 20,
     maxHeight: '60%',
   },
   modalTitle: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#E87722',
+    color: Colors.orange,
     marginBottom: 12,
     textAlign: 'center',
   },
   modalBody: {
     fontSize: 14,
-    color: '#E0E0E0',
+    color: Colors.textLight,
     lineHeight: 22,
   },
   modalClose: {
     marginTop: 16,
     alignItems: 'center',
     padding: 12,
-    backgroundColor: '#E87722',
+    backgroundColor: Colors.orange,
     borderRadius: 8,
   },
   modalCloseText: {
     fontWeight: '700',
-    color: '#fff',
+    color: Colors.white,
     fontSize: 14,
   },
 })

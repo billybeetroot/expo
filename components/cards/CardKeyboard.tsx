@@ -1,8 +1,9 @@
 import React from 'react'
-import { View, Text, Pressable, StyleSheet } from 'react-native'
+import { View, Text, Pressable, StyleSheet, Dimensions } from 'react-native'
 import ParseInputHand from '@/lib/parseInputHand'
 import { getDeck, shuffleDeck, dealCards, getDispHand } from '@/lib/cardDeck'
 import { gameIcons } from '@/lib/gameIcons'
+import { Colors } from '@/constants/colors'
 
 interface CardKeyboardProps {
   enteredValue: string
@@ -81,8 +82,12 @@ export default function CardKeyboard({
     return value
   }
 
+  const screenWidth = Dimensions.get('window').width
+  // 4 keys per row with equal spacing; key diameter fills available width
+  const keySize = Math.floor((screenWidth - 40) / 4)
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: Colors.bgKeyboard }]}>
       {/* Suit row */}
       <View style={styles.row}>
         {SUIT_ROWS.map(({ value, label, display, color }) => (
@@ -90,9 +95,9 @@ export default function CardKeyboard({
             key={value}
             accessibilityLabel={label}
             onPress={() => handleKey(value)}
-            style={styles.key}
+            style={[styles.key, { width: keySize, height: keySize, borderRadius: keySize / 2 }]}
           >
-            <Text style={[styles.keyText, { color }]}>{display}</Text>
+            <Text style={[styles.suitText, { color }]}>{display}</Text>
           </Pressable>
         ))}
       </View>
@@ -105,7 +110,7 @@ export default function CardKeyboard({
               key={value}
               accessibilityLabel={keyAriaLabel(value)}
               onPress={() => handleKey(value)}
-              style={styles.key}
+              style={[styles.key, { width: keySize, height: keySize, borderRadius: keySize / 2 }]}
             >
               <Text style={styles.keyText}>{keyLabel(value)}</Text>
             </Pressable>
@@ -120,28 +125,32 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'space-evenly',
+    paddingVertical: 4,
   },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingVertical: 4,
+    paddingVertical: 2,
   },
   key: {
-    backgroundColor: '#f5c842',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    minWidth: 56,
+    backgroundColor: Colors.keyBg,
     alignItems: 'center',
+    justifyContent: 'center',
     shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+  suitText: {
+    fontSize: 26,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   keyText: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '800',
-    color: '#000',
+    color: Colors.keyText,
     textAlign: 'center',
   },
 })

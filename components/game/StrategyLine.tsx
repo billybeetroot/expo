@@ -1,5 +1,6 @@
 import React from 'react'
 import { View, Text, StyleSheet } from 'react-native'
+import { Colors } from '@/constants/colors'
 
 interface StrategyLineProps {
   text: string
@@ -17,18 +18,17 @@ export default function StrategyLine({ text }: StrategyLineProps) {
 
 const styles = StyleSheet.create({
   banner: {
-    backgroundColor: '#F5C842',
+    backgroundColor: Colors.bannerBg,
     paddingHorizontal: 8,
-    paddingVertical: 6,
+    paddingVertical: 8,
     alignItems: 'center',
-    borderRadius: 4,
-    marginHorizontal: 4,
-    marginVertical: 4,
+    marginHorizontal: 0,
+    marginVertical: 0,
   },
   text: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '800',
-    color: '#000',
+    color: Colors.bannerText,
     textAlign: 'center',
     letterSpacing: 0.5,
   },

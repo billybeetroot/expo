@@ -1,6 +1,7 @@
 import React from 'react'
 import { View, Text, Pressable, StyleSheet } from 'react-native'
 import CardImage from './CardImage'
+import { Colors } from '@/constants/colors'
 
 type AppMode = 'LP' | 'FG' | 'LP Results'
 
@@ -94,10 +95,10 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   chipHold: {
-    backgroundColor: '#E87722',
+    backgroundColor: Colors.chipHold,
   },
   chipHeld: {
-    backgroundColor: '#F5C842',
+    backgroundColor: Colors.chipHeld,
   },
   chipHidden: {
     backgroundColor: 'transparent',

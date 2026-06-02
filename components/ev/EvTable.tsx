@@ -1,5 +1,6 @@
 import React from 'react'
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native'
+import { Colors } from '@/constants/colors'
 
 interface EvTableProps {
   resultsList: any[][]
@@ -78,38 +79,44 @@ export default function EvTable({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: Colors.bgMain,
   },
   header: {
     flexDirection: 'row',
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.tabBarBorder,
   },
   headerText: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#E0E0E0',
+    color: Colors.textLight,
+    letterSpacing: 0.5,
   },
   headerTextCenter: {
     flex: 1,
     fontSize: 11,
     fontWeight: '800',
-    color: '#E87722',
+    color: Colors.orange,
     textAlign: 'center',
   },
   row: {
     flexDirection: 'row',
     paddingHorizontal: 8,
-    paddingVertical: 6,
+    paddingVertical: 7,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.tabBarBorder,
   },
   rowHighlighted: {
-    backgroundColor: '#F5C842',
+    backgroundColor: Colors.chipHeld,
   },
   cell: {
     fontSize: 12,
-    color: '#E0E0E0',
+    color: Colors.textLight,
   },
   cellHighlighted: {
-    color: '#000',
+    color: Colors.keyText,
     fontWeight: '800',
   },
   holdCol: {

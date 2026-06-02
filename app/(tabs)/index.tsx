@@ -20,13 +20,18 @@ import HandDisplay from '@/components/cards/HandDisplay'
 import CardKeyboard from '@/components/cards/CardKeyboard'
 import StrategyLine from '@/components/game/StrategyLine'
 import MainPaytable from '@/components/game/MainPaytable'
+import AppHeader from '@/components/ui/AppHeader'
+import { Colors } from '@/constants/colors'
 
 export default function LivePlayScreen() {
   const router = useRouter()
   const [isDealOff, setDealOff] = useState(false)
   const [showPaytable, setShowPaytable] = useState(false)
 
-  const { pt, coinsPlayed, coinValue, isDeuces, displayName } = useAppStore()
+  const {
+    pt, coinsPlayed, coinValue, isDeuces, displayName,
+    paytableName, isMember, isLoggedIn,
+  } = useAppStore()
 
   const {
     noSpacesHand,
@@ -74,7 +79,6 @@ export default function LivePlayScreen() {
       const decoded = decodeCheck(result.actionPayload!)
       const state = applyCheckResult(decoded)
 
-      // Build httpHand array from noSpacesHand for store
       const httpHand: string[] = []
       let temp = isDeuces ? noSpacesHand.replace(/W/g, '2') : noSpacesHand
       for (let i = 0; i < temp.length; i += 2) httpHand.push(temp.slice(i, i + 2))
@@ -108,21 +112,35 @@ export default function LivePlayScreen() {
     }
   }
 
+  const memberLabel = isLoggedIn && isMember ? 'Member' : 'Free Demo'
+  const denomDisplay = `$${parseFloat(coinValue || '1').toFixed(2)}`
   const description = strategyPrintLine || "ENTER YOUR HAND AND HIT 'DEAL'"
 
   return (
     <SafeAreaView style={styles.screen}>
-      <StrategyLine text={description} />
-      <HandDisplay app="LP" noSpacesHand={noSpacesHand} />
+      <AppHeader onMenu={() => router.push('/config')} />
 
+      <StrategyLine text={description} />
+
+      <View style={styles.cardArea}>
+        <HandDisplay app="LP" noSpacesHand={noSpacesHand} />
+      </View>
+
+      {/* Control row */}
       <View style={styles.controlRow}>
-        <Pressable
-          onPress={() => setShowPaytable((v) => !v)}
-          style={styles.iconButton}
-          accessibilityLabel="Toggle paytable"
-        >
-          <Text style={styles.iconText}>{showPaytable ? '⌨' : '📺'}</Text>
-        </Pressable>
+        <View style={styles.controlLeft}>
+          <Pressable style={styles.helpBtn} accessibilityLabel="Help">
+            <Text style={styles.helpText}>?</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => setShowPaytable((v) => !v)}
+            style={styles.monitorBtn}
+            accessibilityLabel="Toggle paytable"
+          >
+            <View style={styles.monitorScreen} />
+          </Pressable>
+        </View>
 
         <Pressable
           onPress={handleDeal}
@@ -132,6 +150,17 @@ export default function LivePlayScreen() {
         >
           <Text style={styles.dealText}>DEAL</Text>
         </Pressable>
+      </View>
+
+      {/* Game info status row */}
+      <View style={styles.statusRow}>
+        <View style={styles.statusLeft}>
+          <Text style={styles.statusMode}>Live Play</Text>
+          <Text style={styles.statusMember}>{memberLabel}</Text>
+        </View>
+        <Text style={styles.statusInfo} numberOfLines={1}>
+          {displayName}{'  '}{paytableName}{'  '}{denomDisplay}{'  '}Bet {coinsPlayed}
+        </Text>
       </View>
 
       <View style={styles.flex}>
@@ -152,40 +181,102 @@ export default function LivePlayScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#0A0A0A',
+    backgroundColor: Colors.bgMain,
+  },
+  cardArea: {
+    backgroundColor: Colors.bgMain,
+    paddingVertical: 6,
   },
   controlRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 6,
+    backgroundColor: Colors.bgMain,
   },
-  iconButton: {
-    padding: 8,
+  controlLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
-  iconText: {
-    fontSize: 24,
-    color: '#E87722',
+  helpBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.orange,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  helpText: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: Colors.white,
+    lineHeight: 22,
+  },
+  monitorBtn: {
+    width: 44,
+    height: 34,
+    borderWidth: 2,
+    borderColor: Colors.orange,
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 4,
+  },
+  monitorScreen: {
+    width: '80%',
+    height: '60%',
+    borderWidth: 1,
+    borderColor: Colors.orange,
+    borderRadius: 1,
   },
   dealButton: {
-    backgroundColor: '#E87722',
-    borderRadius: 12,
-    paddingHorizontal: 32,
+    backgroundColor: Colors.orange,
+    borderRadius: 10,
+    paddingHorizontal: 36,
     paddingVertical: 12,
     shadowColor: '#000',
     shadowOpacity: 0.3,
     shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
     elevation: 4,
   },
   dealButtonDisabled: {
     opacity: 0.5,
   },
   dealText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#fff',
+    fontSize: 20,
+    fontWeight: '800',
+    color: Colors.white,
     letterSpacing: 1,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 6,
+    backgroundColor: Colors.bgMain,
+  },
+  statusLeft: {
+    marginRight: 10,
+  },
+  statusMode: {
+    fontSize: 11,
+    color: Colors.textLight,
+    fontWeight: '600',
+    lineHeight: 14,
+  },
+  statusMember: {
+    fontSize: 10,
+    color: Colors.textMuted,
+    lineHeight: 13,
+  },
+  statusInfo: {
+    fontSize: 11,
+    color: Colors.textLight,
+    flex: 1,
+    textAlign: 'right',
   },
   flex: {
     flex: 1,
