@@ -31,13 +31,14 @@ describe('CardKeyboard', () => {
     expect(getByLabelText('Backspace')).toBeTruthy()
   })
 
-  it('pressing club after A calls onHandChange with Ac', () => {
+  it('pressing A then club calls onHandChange with Ac', () => {
     const mock = jest.fn()
     const { getByLabelText } = render(
-      <CardKeyboard enteredValue="A" onHandChange={mock} />
+      <CardKeyboard enteredValue="" onHandChange={mock} />
     )
+    fireEvent.press(getByLabelText('A'))
     fireEvent.press(getByLabelText('Club'))
-    expect(mock).toHaveBeenCalledWith('Ac', expect.any(String))
+    expect(mock).toHaveBeenLastCalledWith('Ac', expect.any(String))
   })
 
   it('pressing a rank key calls onHandChange', () => {

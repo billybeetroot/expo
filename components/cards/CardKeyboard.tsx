@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useRef, useEffect } from 'react'
 import { View, Text, Pressable, StyleSheet, Dimensions } from 'react-native'
 import ParseInputHand from '@/lib/parseInputHand'
 import { getDeck, shuffleDeck, dealCards, getDispHand } from '@/lib/cardDeck'
@@ -32,11 +32,24 @@ export default function CardKeyboard({
   isDeuces = false,
   disabled = false,
 }: CardKeyboardProps) {
+  // Own raw-input buffer — separate from the parsed noSpacesHand in the store.
+  // ParseInputHand requires the raw character stream (e.g. 'Ac2d'), not the
+  // padded/parsed store value ('AcXXXXXXXX' or 'XXXXXXXXXX').
+  // useRef so rapid taps always see the latest value (no stale-closure race).
+  const rawInputRef = useRef('')
+
+  // Reset buffer when the parent clears the hand (Next Hand / fresh session).
+  useEffect(() => {
+    if (!enteredValue || enteredValue === 'XXXXXXXXXX') {
+      rawInputRef.current = ''
+    }
+  }, [enteredValue])
+
   const handleKey = (value: string) => {
     if (disabled) return
-
     let noSpacesHand = ''
     let dispHand = ''
+    const raw = rawInputRef.current
 
     if (value === '#') {
       let hand = ''
@@ -48,16 +61,23 @@ export default function CardKeyboard({
       }
       noSpacesHand = hand
       dispHand = getDispHand(hand)
+      rawInputRef.current = hand
     } else if (value === '*') {
       const deck = getDeck()
       const shuffled = shuffleDeck(deck)
       const cards = dealCards(shuffled, 5)
       noSpacesHand = cards.join('').replace(/,/g, '')
       dispHand = getDispHand(noSpacesHand)
+      rawInputRef.current = noSpacesHand
     } else {
-      const result = ParseInputHand('keyboard', value, enteredValue, () => {})
+      const result = ParseInputHand('keyboard', value, raw, () => {})
       noSpacesHand = result.noSpacesHand
       dispHand = result.dispHand
+      // Store the normalized output as the new buffer, not the raw characters.
+      // Prevents suit-before-rank input (e.g. 'd2') from corrupting subsequent
+      // odd-length passthroughs — ParseInputHand normalises pairs on even-length
+      // strings, so the ref always holds rank-before-suit after each even step.
+      rawInputRef.current = noSpacesHand
     }
 
     if (isDeuces) {
