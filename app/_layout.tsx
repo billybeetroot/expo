@@ -33,6 +33,7 @@ export default function RootLayout() {
       <StatusBar style="light" />
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="liveplay/results" options={{ headerShown: false }} />
         <Stack.Screen
           name="config"
