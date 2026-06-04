@@ -1,6 +1,6 @@
 # Technical Spec — PerfectPLAY Native App
 
-> Last updated: 2026-06-04. Reflects build state through Phase 7 (Voice) and planned Phase 8 (Payments).
+> Last updated: 2026-06-04. Reflects build state through Phase 7 (Voice) and planned Phase 8 (Payments). Build toolchain: EAS Build.
 
 ## Context
 
@@ -23,6 +23,7 @@ SPEC.md defines the product. This document records the concrete technical decisi
 | Voice TTS | `expo-speech` | |
 | HTTP | Native `fetch` — no axios | |
 | Compression | `pako` (pure JS) | Used for `check` response only |
+| Build | **EAS Build** (cloud) + `expo-dev-client` | Replaces `expo run:ios` / Xcode as build tool. See `docs/EAS_SETUP_GUIDE.md` |
 | Package manager | yarn classic 1.x | |
 
 ---
@@ -97,6 +98,7 @@ expo/
 ├── assets/
 │   └── cards/                    # 59 PNGs (52 face + cardback + wild suit variants)
 ├── app.json
+├── eas.json                      # EAS Build profiles: development, preview, production
 ├── tailwind.config.js
 └── tsconfig.json
 ```
@@ -217,8 +219,10 @@ CONFIRM: `setup` dispatch → decode → write `displayPaytable`/`paytable`/`val
 - RevenueCat dashboard: project + entitlements + API keys
 - np2: new `/api/revenuecat-webhook` endpoint to write Firestore membership on IAP purchase
 - Env vars: `EXPO_PUBLIC_REVENUECAT_IOS_KEY`, `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY`
+- See `docs/PAYMENT_SETUP_GUIDE.md` for step-by-step store and RevenueCat configuration.
 
 **Native app implementation:**
+- `yarn add react-native-purchases` then `yarn build:sim:ios` (native package — requires EAS rebuild)
 - `lib/purchases.ts`: `Purchases.configure()`, `getOfferings()`, `purchasePackage()`, `getCustomerInfo()`
 - Entitlement check: `customerInfo.entitlements.active['premium']`
 - `AppState` listener on account screen: re-fetch `getCustomerInfo()` on foreground return
@@ -274,6 +278,28 @@ Port of np2 `keyboard.tsx`. `useRef` for raw input buffer (not `useState`) — a
 | `bannerBg` | `#b0d8e8` | Strategy line banner |
 | `chipHeld` | `#f5c842` | Winning row highlight |
 | `tabBar` | `#092535` | Tab bar background |
+
+---
+
+## Build Workflow
+
+**Daily development:** `yarn start` — Metro bundler only. Open the installed development client on the iOS simulator or Android emulator; JS changes hot-reload automatically.
+
+**Native rebuild required** when adding or updating a native package (e.g. `react-native-purchases` in Phase 8):
+```bash
+yarn build:sim:ios      # iOS simulator dev client (cloud build, ~15 min)
+yarn build:sim:android  # Android emulator APK
+```
+
+**Production:**
+```bash
+yarn build:ios          # App Store binary
+yarn build:android      # Play Store AAB
+yarn submit:ios         # Upload to App Store Connect
+yarn submit:android     # Upload to Google Play
+```
+
+EAS setup guide: `docs/EAS_SETUP_GUIDE.md`. One-time setup (`eas login` + `eas init`) must be run before the first build.
 
 ---
 

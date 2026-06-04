@@ -46,8 +46,12 @@
   useVoiceInput (LP card entry + deal/reset/backspace commands); useVoiceControl (FG hold intents
   + draw, TTS echo via expo-speech, callbacksRef for stale-closure safety); CardKeyboard extended
   with forwardRef/useImperativeHandle addToken(); 🎤 button on LP and Training control rows
+- **Build toolchain switched to EAS Build + expo-dev-client.** Xcode no longer used as a build
+  tool — only as a simulator host. `yarn build:sim:ios` / `yarn build:sim:android` replace
+  `expo run:ios` / `expo run:android`. Daily development: `yarn start` + installed dev client.
+  See `docs/EAS_SETUP_GUIDE.md` for one-time setup. Payment spec updated: Apple IAP via
+  RevenueCat (not reader-app web link). `docs/PAYMENT_SETUP_GUIDE.md` covers store setup.
 - NativeWind metro transformer disabled — needs `react-native-reanimated` to re-enable
-- Simulator network error on DEAL — expected in simulator without VPN/tunnel; test on device
 
 ---
 
@@ -161,10 +165,11 @@ backspace=`⌫`. Used in the `dispHand` display line. Verify they render in RN `
 
 ### 3.9 Version / dependency notes
 
-- Scaffold is on **Expo SDK 56** (tech spec said 53 — 56 supersedes it; update the tech spec
-  note). React 19, RN 0.85.
-- **`expo-av` is deprecated** on SDK 53+. For voice capture use **`expo-audio`**
-  (`expo-av` was installed in scaffold — replace it in the voice phase).
+- Scaffold is on **Expo SDK 56** (tech spec said 53 — 56 supersedes it). React 19, RN 0.85.
+- **Voice uses `expo-speech-recognition`**, not AssemblyAI or `expo-audio`. No PCM capture,
+  no WebSocket streaming. `expo-av` remains in the project but is unused by voice.
+- **Build toolchain is EAS Build** + `expo-dev-client`. `expo run:ios` / `expo run:android`
+  are no longer used. See `docs/EAS_SETUP_GUIDE.md`.
 
 ---
 
@@ -299,32 +304,32 @@ recent games quick-switch works and persists.
 
 ---
 
-### Phase 7 — Voice (reimplementation, not port)
+### Phase 7 — Voice ✅ Complete
 
-> SPEC: FG voice (hold commands + TTS) is **device-testing only, not production**. LP voice
-> (card entry) is the shippable target. The 2,400-line np2 `VoiceStreamInput` is web-audio
-> plumbing — **do not port it**. Reuse only the already-ported intent/parse utils + extract
-> the position-mapping logic.
+> Uses **`expo-speech-recognition`** (native iOS/Android) — not AssemblyAI. Completely
+> independent of np2-newvoice's WebSocket/PCM pipeline. Reuses the ported pure logic core.
 
-**Tests-first:**
-- `voice/utils/applyHoldIntent.test.ts`: extract pure `intentToPositions(intent, hand) →
-  number[]` from np2's `applyHoldIntent` (rank/suit/pair/two-pair/trips/positions/all/none);
-  test each branch. (interpretCommand/normalizeSpeech/buildHoldPhrase already tested.)
-- `voice/utils/cardPhraseToToken.test.ts`: "ace of clubs" → `Ac` (LP card entry mapping).
+**Tests (42 total across voice utils):**
+- `voice/utils/applyHoldIntent.test.ts`: `intentToPositions(intent, hand)` — all 10 intent
+  types, 28 tests.
+- `voice/utils/cardPhraseParser.test.ts`: "ace of clubs" → `Ac`, command detection, 19 tests.
+- `voice/utils/interpretCommand.test.ts`, `normalizeSpeech.test.ts`, `buildHoldPhrase.test.ts`
+  (ported from np2-newvoice, previously complete).
 
-**Implementation:**
-- `voice/audio/recorder.ts`: **`expo-audio`** PCM16 @16kHz mono capture → ~100ms frames
-  (replaces Web Audio AudioWorklet). iOS `playAndRecord` session; Android `RECORD_AUDIO`.
-- `voice/assemblyClient.ts`: WS `wss://streaming.assemblyai.com/v3/ws?sample_rate=16000&
-  encoding=pcm_s16le&format_turns=true&token=…`; token from `GET /api/assemblyai-token`.
-- `voice/hooks/useVoiceInput.ts` (LP): frames→WS; final transcript→`detectIntent`/card-token→
-  `ParseInputHand`→gameStore; "deal"→confirm; "next hand" on Results→nextHand.
-- `voice/hooks/useVoiceControl.ts` (FG, behind a flag): `intentToPositions`→holds;
-  "draw"→draw; TTS via **`expo-speech`** `buildHoldPhrase`.
+**Implementation (actual):**
+- `expo-speech-recognition`: `useSpeechRecognitionEvent('result')` fires on each transcript.
+  No audio capture, no WebSocket, no streaming. Permissions via `app.json` plugin.
+- `voice/hooks/useVoiceInput.ts` (LP): final transcript → `parseCardPhrase()` →
+  `keyboardRef.current.addToken(token)` or command callback. Partial shown in strategy line.
+- `voice/hooks/useVoiceControl.ts` (FG): final transcript → `detectIntent()` →
+  `intentToPositions()` → hold chips updated. "draw" → DRAW handler. TTS echo via
+  `expo-speech`. `callbacksRef` pattern avoids stale hand closure after DEAL.
+- `CardKeyboard`: extended with `forwardRef` + `useImperativeHandle` exposing `addToken()`.
+  Feeds voice tokens through `ParseInputHand` keeping `rawInputRef` in sync.
+- 🎤 button on LP and Training control rows. Active state = dark red background.
 
-**DoD:** Device — LP: speak 5 cards → hand populates → "deal" → results. FG (flagged):
-"hold the pair" marks correct cards; "draw" resolves; TTS confirms.
-**Dependency:** confirm `/api/assemblyai-token` is live on Django (else add it).
+**DoD:** Device (EAS dev client) — LP: speak 5 cards → hand populates → "deal" → results.
+FG: "hold the pair" marks correct cards; "draw" resolves; TTS confirms hold aloud.
 
 ---
 
@@ -348,7 +353,7 @@ backend receipt endpoint needed.
   `isMember`/`ppPlanType`; plan label display logic.
 
 **Implementation:**
-- Install `react-native-purchases` + `expo-build-properties` plugin.
+- `yarn add react-native-purchases` then `yarn build:sim:ios` (native package — EAS rebuild required).
 - `lib/purchases.ts`: `configurePurchases(userId)` on app launch; `getOfferings()`;
   `purchasePackage(pkg)`; `getCustomerInfo()` → `isMember`.
 - `(tabs)/account.tsx` — if member: show plan name + expiry. If not member: show
@@ -375,7 +380,7 @@ suppression in production, accessibility labels on cards/keys.
 ## 5. Verification (end-to-end, per SPEC §Verification)
 
 - `yarn test` green at every phase boundary (CI gate).
-- `yarn start` → Expo Go on physical iOS + Android.
+- `yarn start` → EAS development client on iOS simulator / Android emulator.
 - vpengine smoke: `AcKdThJh2s` / Bonus 6/5 → EV table decodes.
 - Auth: signup → Firestore doc; login → previousGames/membership hydrate.
 - Training: DEAL→hold pair→DRAW→correct banner + credit update.
@@ -389,29 +394,30 @@ suppression in production, accessibility labels on cards/keys.
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| **`/api/assemblyai-token` may not exist on Django** | Voice blocked | Verify early (Phase 0 recon); add endpoint server-side if missing |
-| **`expo-audio` PCM16 frame streaming** (no AudioWorklet equiv) | LP/FG voice | Prototype capture→WS in isolation before Phase 7; fall back to chunked file upload if streaming unviable |
 | **Per-action decode contract** (§3.1) | Wrong results silently | Fixed in Phase 0 with explicit tests |
-| **App Store Connect products not created** | Phase 8 blocked | Create products + RevenueCat project before starting Phase 8 code |
+| **EAS build queue time** | Slow native rebuild loop | Rebuilds rare (native package changes only); free tier ~15 min; paid tier faster. `eas build --local` as fallback |
+| **EAS project ID not yet initialised** | First build blocked | Run `eas login && eas init` before Phase 8 (see `docs/EAS_SETUP_GUIDE.md`) |
+| **App Store Connect products not created** | Phase 8 blocked | Complete `docs/PAYMENT_SETUP_GUIDE.md` checklist before starting Phase 8 code |
 | **RevenueCat sandbox latency** | Slow test loop | Use StoreKit Configuration file for local sandbox testing (no network needed) |
-| **$5 setup fee can't be IAP** | Pricing change required | Fold into subscription prices or remove before App Store submission |
+| **$5 setup fee can't be IAP** | Pricing change required | Not charged to native app subscribers — already documented in SPEC |
 | **Firebase anon-auth + AsyncStorage persistence on RN** | Dispatch auth fails | `initializeAuth` with RN persistence already wired; test on device early |
-| **Suit glyphs / card PNG rendering in RN** | Visual breakage | Verify in Phase 1–2 on device |
+| **Suit glyphs / card PNG rendering in RN** | Visual breakage | Verified in Phase 1–2 on device |
 | **Engine response shape drift vs np2** | Mapping bugs | Mappers are pure + tested against real captured payloads |
 
 ---
 
 ## 7. Asset / Port Checklist
 
-- [ ] `assets/cards/` ← 59 PNGs from `np2/public/images/igtImages/`
-- [ ] `lib/gameIcons.ts` ← verbatim
-- [ ] `lib/cardDeck.ts`, `lib/parseInputHand.ts` ← verbatim (strip MUI)
-- [ ] `lib/firebaseAuthErrors.ts` ← `generateFirebaseAuthErrorMessage`
-- [ ] `constants/games/*` ← GameConstants + 5 variant constant files
-- [ ] `paytable/data/*.json` ← 5 JSON + types
-- [ ] voice utils — already ported (interpretCommand, normalizeSpeech, buildHoldPhrase)
-- [ ] `lib/gamblerAlert.ts` — already ported
-- [ ] `voice/utils/applyHoldIntent.ts` ← extract pure `intentToPositions` from np2-newvoice
+- [x] `assets/cards/` ← 59 PNGs from `np2/public/images/igtImages/`
+- [x] `lib/gameIcons.ts` ← verbatim
+- [x] `lib/cardDeck.ts`, `lib/parseInputHand.ts` ← verbatim (strip MUI)
+- [x] `lib/firebaseAuthErrors.ts` ← `generateFirebaseAuthErrorMessage`
+- [x] `constants/gameData.ts` ← all 5 game groups consolidated (replaces separate constant files)
+- [x] `lib/gamblerAlert.ts` ← ported
+- [x] voice utils ← interpretCommand, normalizeSpeech, buildHoldPhrase (from np2-newvoice)
+- [x] `voice/utils/applyHoldIntent.ts` ← `intentToPositions` extracted from np2-newvoice
+- [x] `voice/utils/cardPhraseParser.ts` ← LP card phrase detection (new, not a port)
+- [ ] `paytable/data/*.json` ← not yet ported (paytable stats display deferred)
 
 ---
 
