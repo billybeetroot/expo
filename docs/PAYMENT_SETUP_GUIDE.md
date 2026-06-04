@@ -264,14 +264,14 @@ This can be implemented in np2 separately and does not block the native app code
 Once the above is complete, add these to `../perfectplay.env/.env`:
 
 ```
-EXPO_PUBLIC_REVENUECAT_IOS_KEY=appl_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
-EXPO_PUBLIC_REVENUECAT_ANDROID_KEY=goog_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+EXPO_PUBLIC_REVENUECAT_IOS_KEY=<your RevenueCat iOS public API key>
+EXPO_PUBLIC_REVENUECAT_ANDROID_KEY=<your RevenueCat Android public API key>
 ```
 
 And add this to np2's env:
 
 ```
-REVENUECAT_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+REVENUECAT_WEBHOOK_SECRET=<your RevenueCat webhook signing secret>
 ```
 
 ---
