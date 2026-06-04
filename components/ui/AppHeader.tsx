@@ -15,6 +15,10 @@ export default function AppHeader({ onBack, onMenu }: AppHeaderProps) {
           <Pressable onPress={onBack} style={styles.sideBtn} accessibilityLabel="Back">
             <Text style={styles.sideIcon}>←</Text>
           </Pressable>
+        ) : onMenu ? (
+          <Pressable onPress={onMenu} style={styles.sideBtn} accessibilityLabel="Menu">
+            <Text style={styles.sideIcon}>≡</Text>
+          </Pressable>
         ) : null}
       </View>
 
@@ -23,13 +27,7 @@ export default function AppHeader({ onBack, onMenu }: AppHeaderProps) {
         <Text style={styles.titleBot}>VideoPoker™</Text>
       </View>
 
-      <View style={[styles.side, styles.sideRight]}>
-        {onMenu ? (
-          <Pressable onPress={onMenu} style={styles.sideBtn} accessibilityLabel="Menu">
-            <Text style={styles.sideIcon}>≡</Text>
-          </Pressable>
-        ) : null}
-      </View>
+      <View style={styles.side} />
     </View>
   )
 }
@@ -49,9 +47,6 @@ const styles = StyleSheet.create({
     width: 44,
     alignItems: 'flex-start',
     justifyContent: 'center',
-  },
-  sideRight: {
-    alignItems: 'flex-end',
   },
   sideBtn: {
     padding: 8,
