@@ -1,185 +1,117 @@
 # Technical Spec — PerfectPLAY Native App
 
+> Last updated: 2026-06-04. Reflects build state through Phase 7 (Voice) and planned Phase 8 (Payments).
+
 ## Context
 
-SPEC.md defines the product. This document translates it into concrete technical decisions: file structure, dependencies, state shape, API contracts, and platform constraints. The goal is a scaffold that can be implemented hand-over-hand without re-deriving these decisions.
+SPEC.md defines the product. This document records the concrete technical decisions: stack, file structure, API contracts, and platform constraints. It was initially written before the scaffold; sections marked **[actual]** reflect what was built rather than what was planned.
 
 ---
 
 ## Stack
 
-| Concern | Decision |
-|---|---|
-| Framework | Expo SDK 53, managed workflow |
-| Routing | Expo Router v4 (file-based) |
-| Language | TypeScript throughout |
-| Styling | NativeWind v4 (Tailwind class names in JSX) |
-| State | Zustand (3 stores mirroring np2) |
-| Auth | Firebase JS SDK v9+ (same project as web app) |
-| Payments | `@stripe/stripe-react-native` + PayPal (see §Payments) |
-| Voice STT | AssemblyAI real-time v3 (same service as np2) |
-| Voice TTS | `expo-speech` |
-| Audio capture | `expo-av` or `react-native-audio-record` |
-| HTTP | Native `fetch` — no axios |
-| Compression | `pako` (pure JS — works in RN) |
-| Package manager | yarn classic 1.x |
+| Concern | Decision | Notes |
+|---|---|---|
+| Framework | Expo SDK **56**, managed workflow | Spec said 53; scaffold landed on 56 |
+| Routing | Expo Router v4 (file-based) | |
+| Language | TypeScript throughout | |
+| Styling | NativeWind v4 + Tailwind **v3** | NativeWind v4 requires Tailwind v3, not v4 |
+| State | Zustand (3 stores) | appStore, gameStore, simStore — mirrors np2 |
+| Auth | Firebase JS SDK v12 | `getAuth()` only — Metro can't resolve `firebase/auth/react-native` subpath |
+| Payments | **RevenueCat** (`react-native-purchases`) | iOS StoreKit + Android Play Billing; replaces original Stripe/PayPal plan |
+| Voice STT | **`expo-speech-recognition`** | Native iOS `SFSpeechRecognizer` / Android `SpeechRecognizer`; replaces original AssemblyAI plan |
+| Voice TTS | `expo-speech` | |
+| HTTP | Native `fetch` — no axios | |
+| Compression | `pako` (pure JS) | Used for `check` response only |
+| Package manager | yarn classic 1.x | |
 
 ---
 
-## Project Structure
+## Project Structure (actual)
 
 ```
 expo/
-├── app/                          # Expo Router
-│   ├── _layout.tsx               # Root: fonts, Firebase init, Zustand providers
+├── app/
+│   ├── _layout.tsx               # Firebase init, auth listener, anonymous pre-warm
 │   ├── (tabs)/
 │   │   ├── _layout.tsx           # Bottom tab bar (Live Play | Training | Account)
-│   │   ├── index.tsx             # Live Play — card entry screen
-│   │   ├── training.tsx          # Training — Full Game screen
-│   │   └── account.tsx           # Account / Membership screen
+│   │   ├── index.tsx             # Live Play — card entry + voice input
+│   │   ├── training.tsx          # Training (Full Game) — DEAL→hold→DRAW + voice control
+│   │   └── account.tsx           # Account — auth-aware; membership status + purchase
 │   ├── liveplay/
-│   │   └── results.tsx           # LP Results screen (pushed from index)
-│   ├── config.tsx                # Game Configuration (modal, accessible from LP + FG)
+│   │   └── results.tsx           # LP Results — EV table, hold highlight, Why This Hold?
+│   ├── (auth)/
+│   │   ├── login.tsx
+│   │   ├── signup.tsx
+│   │   └── forgot.tsx
+│   ├── config.tsx                # Game Configuration modal
 │   └── +not-found.tsx
 ├── components/
 │   ├── cards/
-│   │   ├── HandDisplay.tsx       # 5-card row, tap-to-hold (FG) / read-only (LP results)
-│   │   ├── CardKeyboard.tsx      # Rank+suit grid, same logic as np2 keyboard.tsx
-│   │   └── CardImage.tsx         # Single card image with hold overlay
+│   │   ├── CardKeyboard.tsx      # forwardRef + addToken() for voice card entry
+│   │   ├── HandDisplay.tsx       # 5-card row; FG tap-to-hold, LP read-only
+│   │   └── CardImage.tsx
 │   ├── ev/
-│   │   └── EvTable.tsx           # 32-row HOLD/DISCARD/AVG PAYOUT table (LP + FG)
+│   │   └── EvTable.tsx           # ScrollView (not FlatList — avoids jest virtualisation)
 │   ├── game/
-│   │   ├── StrategyLine.tsx      # strategyPrintLine banner
-│   │   ├── WinLine.tsx           # CREDIT / PerfectPLAY / WIN display (FG only)
-│   │   └── HoldOutcomeBanner.tsx # CORRECT HOLD / SUCCESSFUL HOLD / BAD HOLD alert
-│   ├── config/
-│   │   ├── GameMenus.tsx         # Game type → variant → paytable cascade pickers
-│   │   ├── BetPicker.tsx         # Coins 1–5
-│   │   ├── DenominationPicker.tsx
-│   │   └── RecentGames.tsx       # Up to 5 Firestore-backed recent game slots
+│   │   ├── StrategyLine.tsx      # Light blue strategy banner
+│   │   └── MainPaytable.tsx      # Paytable with winning row highlight
 │   └── ui/
-│       └── AlertBox.tsx
+│       └── AppHeader.tsx         # ← and ≡ both on LEFT side
 ├── stores/
-│   ├── appStore.ts               # Auth + game config + app settings
-│   ├── gameStore.ts              # LP-specific state
-│   └── simStore.ts               # FG/Training-specific state
+│   ├── appStore.ts
+│   ├── gameStore.ts
+│   └── simStore.ts
 ├── lib/
-│   ├── dispatch.ts               # asyncDispatch — POST to vpengine, decompress response
-│   ├── firebase.ts               # Firebase app init (JS SDK)
-│   ├── authApi.ts                # signup / login / logout / savePreviousGames
-│   └── compression.ts           # base64 → pako.inflate helper
-├── hooks/
-│   ├── useAuth.ts                # Firebase onAuthStateChanged listener
-│   └── useGameConfig.ts         # Game configured guard (equivalent of GameConfig.tsx)
+│   ├── dispatch.ts               # asyncDispatch; USE_LOCAL_BACKEND flag
+│   ├── decode.ts                 # decodeCheck() compressed; decodePlain() plain
+│   ├── firebase.ts
+│   ├── authApi.ts                # signUp, signIn, logoutUser, savePreviousGames, etc.
+│   ├── firebaseAuthErrors.ts
+│   ├── previousGames.ts          # parsePreviousGames, prependPreviousGame, serialize
+│   ├── gamblerAlert.ts
+│   ├── cardDeck.ts
+│   ├── parseInputHand.ts
+│   ├── cardImageMap.ts
+│   └── gameIcons.ts
+├── game/
+│   ├── buildCheckRequest.ts
+│   ├── applyCheckResult.ts
+│   ├── applyDealResult.ts
+│   ├── applyDrawResult.ts
+│   └── formatHoldMessage.ts
 ├── voice/
 │   ├── hooks/
-│   │   ├── useVoiceInput.ts      # LP: card entry via AssemblyAI stream
-│   │   └── useVoiceControl.ts    # FG: hold commands + "next hand" detection
+│   │   ├── useVoiceInput.ts      # LP: card entry via expo-speech-recognition
+│   │   └── useVoiceControl.ts    # FG: hold commands + draw; TTS via expo-speech
 │   └── utils/
-│       ├── interpretCommand.ts   # Port from np2-newvoice (VoiceIntent detection)
-│       ├── normalizeSpeech.ts    # Port from np2-newvoice (phonetic correction)
-│       ├── buildHoldPhrase.ts    # Port from np2-newvoice (TTS phrase builder)
-│       └── phoneticLookup.json   # Port from np2-newvoice
-├── paytable/
-│   └── data/                     # Port JSON files from np2/(common)/paytable/data/
+│       ├── interpretCommand.ts   # VoiceIntent detection (ported from np2-newvoice)
+│       ├── normalizeSpeech.ts    # Phonetic correction
+│       ├── buildHoldPhrase.ts    # TTS phrase builder
+│       ├── applyHoldIntent.ts    # intentToPositions(intent, hand) → number[]
+│       ├── cardPhraseParser.ts   # "ace of clubs" → "Ac" for LP card entry
+│       └── phoneticLookup.json
 ├── constants/
-│   └── games/                    # Port GameConstants, BonusGameConstants etc. from np2
+│   ├── colors.ts                 # Design tokens
+│   └── gameData.ts               # All 5 game groups; ptFromVariantPaytable()
 ├── assets/
-│   └── cards/                    # Playing card images (52 + cardback + wild suits)
+│   └── cards/                    # 59 PNGs (52 face + cardback + wild suit variants)
 ├── app.json
-├── app.config.ts                 # Exposes env vars via `extra` (EXPO_PUBLIC_ prefix)
 ├── tailwind.config.js
-├── tsconfig.json
-└── .env                          # gitignored — sourced from ../perfectplay.env/.env
+└── tsconfig.json
 ```
 
 ---
 
 ## Navigation Architecture
 
-Expo Router file-based routing. Three bottom tabs:
-
-| Tab | File | Stack inside |
+| Tab | File | Notes |
 |---|---|---|
 | Live Play | `(tabs)/index.tsx` | Push to `liveplay/results.tsx` after DEAL |
-| Training | `(tabs)/training.tsx` | Single screen (no push — FG is self-contained) |
-| Account | `(tabs)/account.tsx` | Single screen |
+| Training | `(tabs)/training.tsx` | Self-contained; no push |
+| Account | `(tabs)/account.tsx` | Auth-aware; purchase flow |
 
-Game Configuration opens as a **modal** from either Live Play or Training (link via `router.push('/config')`). On save it returns via `router.back()`.
-
----
-
-## State Management
-
-Three Zustand stores — same shape as np2 to minimise cognitive translation cost.
-
-### `appStore`
-```ts
-{
-  // Auth
-  isLoggedIn: boolean
-  isMember: boolean
-  isSignedUp: boolean
-  userName: string
-  userEmail: string
-  // Game config
-  gameName: string        // e.g. 'Bonus'
-  gameType: string        // e.g. 'Bonus Poker'
-  displayName: string     // e.g. 'Bonus Poker'
-  paytableName: string    // e.g. '6/5'
-  pt: string              // e.g. 'Bonus_6_5'
-  coinValue: string       // e.g. '1'
-  coinsPlayed: string     // e.g. '5'
-  isGameConfigured: boolean
-  previousGames: string   // comma-separated, max 15 tokens (5 games × 3 fields)
-  // Subscription IDs (for restore)
-  ppPlanType / ppSubscriptionId / stripeSubscriptionId / stripeCustomerId
-  // Voice
-  isVoiceEnabled: boolean
-  isVoiceSupported: boolean
-}
-```
-
-### `gameStore` (LP)
-```ts
-{
-  noSpacesHand: string        // 10-char e.g. 'AcKdThJh2c'
-  displayHand: string         // formatted for display
-  hand: string[]              // ['Ac','Kd','Th','Jh','2c']
-  holdCardPositions: number[] // 1-based
-  evSelectedCardPositions: number[]
-  resultsList: any[][]        // 32 rows × 3 cols [heldCards, discards, ev]
-  evs: string[][]
-  strategyPrintLine: string
-  suggestedHoldCards: string[]
-  payValue: number
-  gameState: string           // 'New Game' | 'After Deal'
-  isKeyboardEnabled: boolean
-  isPaytableOpen: boolean
-  displayProb: boolean
-  // ... (full mirror of np2 useGameStore)
-}
-```
-
-### `simStore` (FG/Training)
-```ts
-{
-  // Same core fields as gameStore plus:
-  creditSum: number
-  bestCreditSum: number
-  winSum: number
-  gameNumber: number
-  handAssist: boolean
-  defaultAssist: boolean
-  dealText: 'DEAL' | 'DRAW'
-  badlyPlayedHands: string[]
-  replayHands: any[]
-  shadowHand: string[]
-  shadowHandResults: any[]
-  showShadowEv: boolean
-  // ... (full mirror of np2 useSimStore)
-}
-```
+Config modal: `router.push('/config')` from LP or Training header (≡ button). Returns via `router.back()`. Auth screens: `app/(auth)/` stack group.
 
 ---
 
@@ -187,202 +119,167 @@ Three Zustand stores — same shape as np2 to minimise cognitive translation cos
 
 ### vpengine dispatch (`lib/dispatch.ts`)
 
-Mirrors `asyncDispatch` from np2. Endpoint: `https://vegaslearning.com/api/common/dispatch`
-
 ```
-POST /api/common/dispatch
+POST http://localhost:8000/api/          (USE_LOCAL_BACKEND = true)
+POST https://vegaslearning.com/api/     (production)
 Authorization: Bearer <Firebase ID token>
 Content-Type: application/json
 Body: { name: 'check'|'deal'|'draw'|'setup', ...params }
-
-Response: { title: 'successful', data: { data: { actionPayload: string } } }
-actionPayload: base64-encoded pako-deflated JSON
 ```
 
-Decompression (`lib/compression.ts`):
-```ts
-import pako from 'pako'
-const bytes = Uint8Array.from(atob(actionPayload), c => c.charCodeAt(0))
-const json = pako.inflate(bytes, { to: 'string' })
-const result = JSON.parse(JSON.parse(json))  // double-parse as in np2
-```
+Django returns the payload **directly** (no np2 envelope). Decoding differs per action:
 
-For unauthenticated users: `signInAnonymously(auth)` before dispatch (same pattern as np2).
+| Action | Response type | Decoder |
+|---|---|---|
+| `check` | base64+zlib string | `decodeCheck()` — inflate + double JSON.parse |
+| `deal` / `draw` / `setup` | plain JSON object | `decodePlain()` — single JSON.parse |
+
+For unauthenticated users: `signInAnonymously(auth)` is pre-warmed at app launch to avoid Firebase clock-skew delay.
+
+**`USE_LOCAL_BACKEND = true` in `lib/dispatch.ts` — must be set `false` before production build.**
 
 ### Auth endpoints (`lib/authApi.ts`)
 
-Same Django REST endpoints at `vegaslearning.com`:
-- `POST /api/auth/signup` — create Firestore user doc
-- `POST /api/auth/login` — fetch membership/previousGames on sign-in
-- `POST /api/auth/logout` — server-side session invalidation
-- `POST /api/auth/previousgames` — save updated previousGames string
-- `POST /api/auth/membership` — save membership plan data
+Endpoints are **np2 Next.js routes** at `perfectplay.vegas/api/auth/` — not Django.
 
-All requests include `Authorization: Bearer <Firebase ID token>`.
+- `POST /api/auth/signup`
+- `POST /api/auth/login` — returns `isMember`, `previousGames`, subscription IDs
+- `POST /api/auth/logout`
+- `POST /api/auth/previousgames`
 
----
+All include `Authorization: Bearer <Firebase ID token>`.
 
-## Firebase Auth (`lib/firebase.ts`)
+### np2 Payment architecture (for context)
 
-Use Firebase JS SDK v9+ (modular). Same Firebase project as web app. Credentials via `app.config.ts` extra / `EXPO_PUBLIC_` env vars.
+np2 uses Stripe (primary) and PayPal (secondary). On purchase: Stripe webhook → `checkout.session.completed` → writes `member: true`, plan type, subscription IDs, `currentPeriodEnd` to Firestore. The native app's `mergeLoginUserData` reads these same Firestore fields.
 
-```ts
-import { initializeApp } from 'firebase/app'
-import { getAuth } from 'firebase/auth'
-import { getFirestore } from 'firebase/firestore'
-
-const app = initializeApp({ apiKey, authDomain, projectId, ... })
-export const auth = getAuth(app)
-export const db = getFirestore(app)
-```
-
-Auth flows: `createUserWithEmailAndPassword`, `signInWithEmailAndPassword`, `signInAnonymously`, `signOut`. Auth state persisted via `AsyncStorage` (Expo default for Firebase JS SDK on RN).
+For native IAP subscribers, a new np2 endpoint (`/api/revenuecat-webhook`) will receive RevenueCat webhook events and write the same Firestore fields — keeping one source of truth for both web and native subscribers.
 
 ---
 
-## Card UI
+## Firebase Auth
 
-### `CardKeyboard.tsx`
-Port of np2 `keyboard.tsx`. Grid layout:
-- Row 1: Suit buttons — ♣ ♦ ♥ ♠
-- Rows 2–4: Rank buttons — A 2 3 4 5 6 7 8 9 T J Q K + BS
-- Special: `#` = random deuces hand, `*` = random hand, BS = backspace
-
-Input state: same `noSpacesHand` / `displayHand` / `enteredValue` pattern from np2. Port `ParseInputHand` utility directly. Deuces: display 2s as W.
-
-### `HandDisplay.tsx`
-5 `Pressable` card images in a row. Props: `{ app: 'LP'|'FG'|'LP Results', noSpacesHand: string }`.
-- FG: tap toggles hold/release → updates `cardsHeld[]` in simStore
-- LP Results: read-only, hold positions set by engine
-- Hold overlay: coloured chip above/below card with text HOLD/HELD (mirrors np2 SimHoldLine)
-
-Card images: copy from `np2/public/images/cards/` into `assets/cards/`. 52 cards + cardback + wild variants.
-
-### `EvTable.tsx`
-`FlatList` of 32 rows. Columns: HOLD (cards to keep) | DISCARD (cards to drop) | AVG PAYOUT (dollar EV). Highlighted row = currently selected hold. Tap row → `setEvSelectedCardPositions`, update hold chips on HandDisplay. Shadow mode: replaces EV with "WHAT WOULD IT HAVE BEEN?" outcome strings. Shared between LP Results and FG.
+`getAuth()` only — `firebase/auth/react-native` subpath is not resolvable by Metro. Anonymous sign-in pre-warmed in `_layout.tsx` on app launch (avoids 20s clock-skew delay on first DEAL for non-logged-in users).
 
 ---
 
-## Game Configuration Screen (`app/config.tsx`)
+## Voice (Phase 7 — implemented)
 
-Modal screen. Contents:
+### STT: `expo-speech-recognition`
 
-1. **Recent Games** (`components/config/RecentGames.tsx`) — read `previousGames` string from appStore (comma-separated triples: displayName,gameName,paytableName × 5). Tapping a row pre-fills the game selectors. Firestore write on config close via `authApi.savePreviousGames`. Disabled for unauthenticated users.
+Native iOS `SFSpeechRecognizer` / Android `SpeechRecognizer`. No AssemblyAI, no WebSocket streaming, no PCM capture. The web app (np2-newvoice) uses AssemblyAI; the native app is completely independent.
 
-2. **Game selectors** (`components/config/GameMenus.tsx`) — cascade: Game Type → Variant → Paytable. Disabled/locked for unauthenticated users (show membership CTA). Data from ported `constants/games/` files.
+Permissions configured in `app.json` via the `expo-speech-recognition` plugin (iOS microphone + speech recognition strings; Android `RECORD_AUDIO` already present).
 
-3. **BetPicker** — coins 1–5 (Picker or segmented control).
+### LP card entry (`voice/hooks/useVoiceInput.ts`)
 
-4. **DenominationPicker** — 25¢ / 50¢ / $1 / $2 / $5.
+- `useSpeechRecognitionEvent('result')` → `parseCardPhrase(transcript)` from `voice/utils/cardPhraseParser.ts`
+- Card detected → `keyboardRef.current.addToken(token)` (feeds through CardKeyboard's rawInputRef)
+- "deal" → triggers DEAL; "reset"/"backspace" → resets hand
+- Partial transcripts shown in strategy line while listening
 
-5. **Confirm button** — calls `asyncDispatch({ name: 'setup', pt })`, stores results in simStore (strategyTable, valueTable, paytable, displayPaytable, fullGameName, shortGameName), navigates back.
+### FG hold commands (`voice/hooks/useVoiceControl.ts`)
 
-Paytable data: port static JSON files from `np2/app/(common)/paytable/data/` → `paytable/data/`. No API call needed for paytable stats display.
+- `useSpeechRecognitionEvent('result')` → `detectIntent(transcript)` → `intentToPositions(intent, hand)`
+- Positions applied to `cardsHeld[]` / `cardHoldCss[]` / `cardHoldText[]` in simStore
+- "draw" → triggers DRAW handler
+- TTS echo via `expo-speech`: `buildHoldPhrase(hand, positions)` spoken after hold applied
+- Uses `callbacksRef` so stale-closure never sees an old hand after a new DEAL
+
+### CardKeyboard voice integration
+
+`forwardRef` + `useImperativeHandle` exposes `addToken(token: string)`: feeds a 2-char card token through `ParseInputHand` (rank step then suit step), keeping `rawInputRef` in sync with keyboard-typed input. Voice and keyboard input are interchangeable mid-entry.
 
 ---
 
-## Payments
+## Game Configuration (`app/config.tsx`)
 
-**iOS (reader app model):** No in-app payment processing on iOS. The account screen displays plan names and prices, then opens `https://perfectplay.vegas/#member` in Safari via `Linking.openURL`. Apple gets nothing. Membership state is read from Firestore after the user purchases on the web and returns to the app.
+Modal screen. All game data in `constants/gameData.ts`:
+- 5 game groups (Bonus Poker, Double Double Bonus, Triple Bonus Poker, Deuces Wild Poker, Other)
+- Every variant and paytable for each group
+- `ptFromVariantPaytable(gameName, item)` — uses `item.code` when present, else `gameName + '_' + value.replace(/\//g, '_')`
 
-**Android:** Full native payment sheet via `@stripe/stripe-react-native` (Monthly credit card, Annual, 48-Hour Pass) and PayPal SDK / WebView (Monthly PayPal). Same Stripe price IDs and PayPal plan IDs as the web app. Calls the same Django checkout endpoints at `vegaslearning.com/api/stripe/checkout` and PayPal equivalent.
+UI: game type chip row → variant radio list (hidden if group has one variant) → paytable radio list → bet chip row (1–5) → denomination chip row (25c/50c/$1/$2/$5) → summary → CONFIRM.
 
-**Membership restore:** On app launch and on account screen focus, re-fetch membership status from Firestore via `authApi.login`. No platform-specific restore flow needed.
+CONFIRM: `setup` dispatch → decode → write `displayPaytable`/`paytable`/`valueTable`/`strategyTable` to simStore + `gameType`/`gameName`/`pt`/`coinValue`/`coinsPlayed` to appStore + `prependPreviousGame` + `savePreviousGames` (if logged in).
+
+`previousGames` format: comma-joined triples `displayName,gameName,paytableName`, max 5 games (15 tokens). Managed by `lib/previousGames.ts` (pure, tested).
 
 ---
 
-## Voice
+## Payments (Phase 8 — planned)
 
-### LP Card Entry (`voice/hooks/useVoiceInput.ts`)
-1. Fetch temp token from `vegaslearning.com/api/assemblyai-token` (Django endpoint).
-2. Open WebSocket to `wss://streaming.assemblyai.com/v3/ws` with token + `sample_rate=16000`.
-3. Capture mic audio via `expo-av` at 16 kHz mono PCM16.
-4. Stream PCM frames (~100ms) to AssemblyAI WS.
-5. On final transcript: port `parseIntent()` from `VoiceStreamInput.tsx` — detects card phrases ("ace of clubs" → `Ac`), commands ("backspace", "deal").
-6. On "next hand" spoken on Results screen: call `nextHandHandler()` (same pattern as np2 Results page).
+**Library:** RevenueCat (`react-native-purchases`). Abstracts StoreKit (iOS) and Google Play Billing (Android) behind one API. Handles receipt validation server-side — no custom backend endpoint needed for the native app itself.
 
-### FG Hold Commands (`voice/hooks/useVoiceControl.ts`)
-Port `interpretCommand.ts` and `normalizeSpeech.ts` from `np2-newvoice/app/voice/utils/`. Detects `VoiceIntent` types: `hold_all`, `hold_none`, `hold_pair`, `hold_two_pair`, `hold_trips`, `hold_rank`, `hold_ranks`, `hold_suit`, `hold_positions`, `draw`. On intent: update `cardsHeld[]` in simStore and call `handleDrawButton()` on `draw`.
+**Pre-requisites before Phase 8 code:**
+- App Store Connect: Monthly, Annual, 48-Hour Pass subscription products
+- Google Play Console: same products mirrored
+- RevenueCat dashboard: project + entitlements + API keys
+- np2: new `/api/revenuecat-webhook` endpoint to write Firestore membership on IAP purchase
+- Env vars: `EXPO_PUBLIC_REVENUECAT_IOS_KEY`, `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY`
 
-### TTS (`expo-speech`)
-After hold is applied, speak `buildHoldPhrase(hand, holdPositions)` output. Port `buildHoldPhrase.ts` from `np2-newvoice` directly.
+**Native app implementation:**
+- `lib/purchases.ts`: `Purchases.configure()`, `getOfferings()`, `purchasePackage()`, `getCustomerInfo()`
+- Entitlement check: `customerInfo.entitlements.active['premium']`
+- `AppState` listener on account screen: re-fetch `getCustomerInfo()` on foreground return
+- Restore purchases: `Purchases.restorePurchases()`
 
-### Platform notes
-- iOS: `AVAudioSession` category must be set to `playAndRecord` for simultaneous playback+capture.
-- Android: `RECORD_AUDIO` permission in `app.json`.
-- AssemblyAI env var: `ASSEMBLYAI_API_KEY` on Django server (already present); native app fetches short-lived token.
+**$5 setup fee:** Not representable as an IAP product. Not charged to native app subscribers.
 
 ---
 
 ## Environment Variables
 
-`app.config.ts` exposes via `expo-constants` / `EXPO_PUBLIC_` prefix:
-
 ```
 EXPO_PUBLIC_API_URL=https://vegaslearning.com
+EXPO_PUBLIC_AUTH_URL=https://perfectplay.vegas
 EXPO_PUBLIC_FIREBASE_API_KEY=...
 EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=...
 EXPO_PUBLIC_FIREBASE_PROJECT_ID=...
 EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=...
 EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...
 EXPO_PUBLIC_FIREBASE_APP_ID=...
-EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY=...
-EXPO_PUBLIC_PAYPAL_CLIENT_ID=...
-EXPO_PUBLIC_MONTHLY_PRICE=12.95
-EXPO_PUBLIC_ANNUAL_PRICE=99.00
-EXPO_PUBLIC_VISITOR_PRICE=4.99
-EXPO_PUBLIC_SETUP_FEE=5.00
+EXPO_PUBLIC_REVENUECAT_IOS_KEY=...        # Phase 8
+EXPO_PUBLIC_REVENUECAT_ANDROID_KEY=...    # Phase 8
+EXPO_PUBLIC_MONTHLY_PRICE=12.95           # Display only
+EXPO_PUBLIC_ANNUAL_PRICE=99.00            # Display only
+EXPO_PUBLIC_VISITOR_PRICE=4.99            # Display only
 ```
 
-Sourced from `../perfectplay.env/.env` (same shared store as np2).
+Sourced from `../perfectplay.env/.env`.
 
 ---
 
-## Ported Assets from np2
+## Card UI
 
-These files copy across unchanged or near-unchanged:
+### CardKeyboard
+Port of np2 `keyboard.tsx`. `useRef` for raw input buffer (not `useState`) — avoids stale closure race on rapid taps. Stores normalised ParseInputHand output, not raw chars. Extended with `forwardRef` + `useImperativeHandle` exposing `addToken(token)` for voice card entry.
 
-| Source (np2) | Destination (expo) |
-|---|---|
-| `app/(common)/paytable/data/*.json` | `paytable/data/*.json` |
-| `app/(common)/components/dropdowns/GameConstants.tsx` | `constants/games/GameConstants.ts` |
-| `public/images/cards/` | `assets/cards/` |
-| `app/voice/utils/interpretCommand.ts` (np2-newvoice) | `voice/utils/interpretCommand.ts` |
-| `app/voice/utils/normalizeSpeech.ts` (np2-newvoice) | `voice/utils/normalizeSpeech.ts` |
-| `app/voice/utils/buildHoldPhrase.ts` (np2-newvoice) | `voice/utils/buildHoldPhrase.ts` |
-| `app/voice/utils/phoneticLookup.json` (np2-newvoice) | `voice/utils/phoneticLookup.json` |
-| `app/(common)/utils/gamblerAlert.ts` | `lib/gamblerAlert.ts` |
+### HandDisplay
+5 `Pressable` card images. Props: `{ app: 'LP'|'FG'|'LP Results', noSpacesHand, cardHoldText, cardHoldCss, onCardPress }`. FG: tap toggles Hold→Held→Release cycle. LP Results: read-only.
+
+### EvTable
+`ScrollView` + `map` (not `FlatList` — avoids jest virtualisation issues). 32 rows × 3 cols: held cards | discards | avg payout. Tap row → applies hold positions to HandDisplay.
 
 ---
 
-## Scaffold Order
+## Design Tokens (`constants/colors.ts`)
 
-1. `create-expo-app` in a temp dir → move contents to `/devspot/expo/` (rename project in `app.json` to `perfectplay`)
-2. Install core deps: `nativewind`, `zustand`, `firebase`, `pako`, `expo-speech`, `expo-av`
-3. `app.config.ts` + `.env` wired to `../perfectplay.env/.env`
-4. Root `_layout.tsx` — Firebase init, auth listener, Zustand hydration
-5. Tab navigator with three placeholder screens
-6. `lib/dispatch.ts` + `lib/compression.ts` — API layer with a smoke-test against vpengine
-7. Zustand stores (appStore → gameStore → simStore)
-8. `CardKeyboard` + `HandDisplay` components
-9. Live Play tab — card entry → DEAL → Results screen with EvTable
-10. Firebase Auth screens (sign up / log in)
-11. Training tab — full game loop (DEAL → hold → DRAW → outcome)
-12. Game Configuration modal
-13. Voice LP (card entry)
-14. Voice FG (hold commands + TTS)
-15. Account/Membership screen + payment flow
-16. Polish: NativeWind theme, dark mode, haptics
+| Token | Value | Use |
+|---|---|---|
+| `bgMain` | `#0d3a50` | Screen background |
+| `bgKeyboard` | `#092535` | Keyboard background |
+| `orange` | `#e87722` | Primary action, hold chips |
+| `keyBg` | `#f5e6c0` | Keyboard key background |
+| `bannerBg` | `#b0d8e8` | Strategy line banner |
+| `chipHeld` | `#f5c842` | Winning row highlight |
+| `tabBar` | `#092535` | Tab bar background |
 
 ---
 
-## Verification
+## Known Issues (Phase 9 backlog)
 
-- `yarn start` → Expo Go on physical iOS + Android device
-- `yarn ios` / `yarn android` → simulators for layout/flow testing
-- Smoke test vpengine: enter `AcKdThJh2s` for Bonus 6/5 → confirm EV table returns and decompresses
-- Auth: sign up new account → verify Firestore doc created → verify previousGames saves/loads
-- Training: DEAL → hold pair → DRAW → verify CORRECT HOLD / BAD HOLD banner
-- Voice LP: speak "Ace of clubs King of diamonds Ten hearts Jack spades Two clubs" → verify hand populated
-- Voice FG: say "hold the pair" → verify correct cards marked HELD
-- Payments: verify membership screen renders plan options and links correctly (platform-dependent)
+- Firebase auth persistence warning — needs `initializeAuth` + `AsyncStorage` persistence
+- `SafeAreaView` from `react-native` deprecated — switch to `react-native-safe-area-context`
+- NativeWind `className` not active — needs `react-native-reanimated` to enable metro transformer
+- `USE_LOCAL_BACKEND = true` — must flip to `false` before any production build

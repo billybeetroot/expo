@@ -18,16 +18,17 @@ Users with an active paid membership. Access to all supported game variants, pay
 
 ## Membership
 
-Membership is purchased in-app. Four options:
+Membership is purchased in-app via **Apple In-App Purchase** (iOS) and **Google Play Billing** (Android), managed through RevenueCat. Three subscription products:
 
-| Plan | Price | Billing | Processor |
-|---|---|---|---|
-| Monthly | $12.95/mo | Recurring monthly | PayPal |
-| Monthly | $12.95/mo | Recurring monthly | Stripe (credit card, Apple Pay, Google Pay, Cash App) |
-| Annual | $99.00/yr | Recurring annually | Stripe only |
-| 48-Hour Visitor Pass | $4.99 | One-time | Stripe only |
+| Plan | Price | Billing |
+|---|---|---|
+| Monthly | $12.95/mo | Recurring monthly |
+| Annual | $99.00/yr | Recurring annually |
+| 48-Hour Visitor Pass | $4.99 | One-time |
 
-Monthly and Annual Stripe plans may include a one-time $5.00 setup fee, which can be waived (e.g. via coupon or promotion). The 48-Hour Visitor Pass has no setup fee.
+Note: The $5.00 setup fee that exists on the web app cannot be represented as a native IAP product and is not charged via the native app.
+
+The web app (perfectplay.vegas) uses Stripe and PayPal separately. Native app subscribers are tracked via RevenueCat; a RevenueCat webhook writes membership state to Firestore so web and native recognise each other's subscribers.
 
 Membership unlocks all 18 supported game variants and paytables. No other feature differences.
 
@@ -156,6 +157,6 @@ Casual visitors (unauthenticated) see the game selection controls disabled and l
 - Social features, leaderboards, history tracking
 - Push notifications
 - Offline / cached strategy (app requires network for engine calls)
-- Apple Pay / Google Pay (Stripe and PayPal only)
 - Tablet-optimised layouts (phone only for v1)
 - Android-specific voice engine differences (handled at implementation)
+- $5.00 setup fee (web-only pricing; not representable as native IAP)

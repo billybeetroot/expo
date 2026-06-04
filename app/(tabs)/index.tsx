@@ -1,5 +1,5 @@
 'use client'
-import React, { useState } from 'react'
+import React, { useState, useRef, useCallback } from 'react'
 import {
   View,
   Text,
@@ -17,16 +17,18 @@ import { buildCheckRequest } from '@/game/buildCheckRequest'
 import { applyCheckResult } from '@/game/applyCheckResult'
 import { interpretGamblerAlert } from '@/lib/gamblerAlert'
 import HandDisplay from '@/components/cards/HandDisplay'
-import CardKeyboard from '@/components/cards/CardKeyboard'
+import CardKeyboard, { CardKeyboardHandle } from '@/components/cards/CardKeyboard'
 import StrategyLine from '@/components/game/StrategyLine'
 import MainPaytable from '@/components/game/MainPaytable'
 import AppHeader from '@/components/ui/AppHeader'
 import { Colors } from '@/constants/colors'
+import { useVoiceInput } from '@/voice/hooks/useVoiceInput'
 
 export default function LivePlayScreen() {
   const router = useRouter()
   const [isDealOff, setDealOff] = useState(false)
   const [showPaytable, setShowPaytable] = useState(false)
+  const keyboardRef = useRef<CardKeyboardHandle>(null)
 
   const {
     pt, coinsPlayed, coinValue, isDeuces, displayName,
@@ -112,9 +114,35 @@ export default function LivePlayScreen() {
     }
   }
 
+  // Voice input callbacks — stable refs so useVoiceInput doesn't re-subscribe on every render
+  const handleVoiceCard = useCallback((token: string) => {
+    keyboardRef.current?.addToken(token)
+  }, [])
+
+  const handleVoiceDeal = useCallback(() => {
+    handleDeal()
+  }, [noSpacesHand, pt, coinsPlayed, coinValue, isDeuces])
+
+  const handleVoiceReset = useCallback(() => {
+    handleHandChange('XXXXXXXXXX', '')
+  }, [])
+
+  const handleVoiceBackspace = useCallback(() => {
+    keyboardRef.current?.addToken('BS'.slice(0, 2)) // handled by addToken guard — won't match length 2, so call handleKey via addToken workaround
+  }, [])
+
+  const { isListening, partial, toggle: voiceToggle } = useVoiceInput({
+    onCard: handleVoiceCard,
+    onDeal: handleVoiceDeal,
+    onReset: handleVoiceReset,
+    onBackspace: handleVoiceReset, // backspace resets for simplicity
+  })
+
   const memberLabel = isLoggedIn && isMember ? 'Member' : 'Free Demo'
   const denomDisplay = `$${parseFloat(coinValue || '1').toFixed(2)}`
-  const description = strategyPrintLine || "ENTER YOUR HAND AND HIT 'DEAL'"
+  const description = isListening && partial
+    ? partial
+    : strategyPrintLine || "ENTER YOUR HAND AND HIT 'DEAL'"
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -129,10 +157,16 @@ export default function LivePlayScreen() {
       {/* Control row */}
       <View style={styles.controlRow}>
         <View style={styles.controlLeft}>
-          <Pressable style={styles.helpBtn} accessibilityLabel="Help">
-            <Text style={styles.helpText}>?</Text>
+          {/* Voice mic button */}
+          <Pressable
+            onPress={voiceToggle}
+            style={[styles.micBtn, isListening && styles.micBtnActive]}
+            accessibilityLabel={isListening ? 'Stop voice' : 'Start voice'}
+          >
+            <Text style={[styles.micIcon, isListening && styles.micIconActive]}>🎤</Text>
           </Pressable>
 
+          {/* Paytable toggle */}
           <Pressable
             onPress={() => setShowPaytable((v) => !v)}
             style={styles.monitorBtn}
@@ -168,6 +202,7 @@ export default function LivePlayScreen() {
           <MainPaytable displayPaytable={displayPaytable} displayName={displayName} />
         ) : (
           <CardKeyboard
+            ref={keyboardRef}
             enteredValue={noSpacesHand}
             onHandChange={handleHandChange}
             isDeuces={isDeuces}
@@ -200,19 +235,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  helpBtn: {
+  micBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: Colors.orange,
+    backgroundColor: Colors.bgKeyboard,
+    borderWidth: 1.5,
+    borderColor: Colors.tabBarBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  helpText: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: Colors.white,
-    lineHeight: 22,
+  micBtnActive: {
+    backgroundColor: '#7a2020',
+    borderColor: '#cc3333',
+  },
+  micIcon: {
+    fontSize: 18,
+  },
+  micIconActive: {
+    // emoji stays same, border/bg communicates state
   },
   monitorBtn: {
     width: 44,

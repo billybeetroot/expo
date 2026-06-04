@@ -1,9 +1,14 @@
-import React, { useRef, useEffect } from 'react'
+import React, { useRef, useEffect, forwardRef, useImperativeHandle } from 'react'
 import { View, Text, Pressable, StyleSheet, Dimensions } from 'react-native'
 import ParseInputHand from '@/lib/parseInputHand'
 import { getDeck, shuffleDeck, dealCards, getDispHand } from '@/lib/cardDeck'
 import { gameIcons } from '@/lib/gameIcons'
 import { Colors } from '@/constants/colors'
+
+export type CardKeyboardHandle = {
+  // Add a full 2-char card token (e.g. 'Ac') from voice, keeping rawInputRef in sync.
+  addToken: (token: string) => void
+}
 
 interface CardKeyboardProps {
   enteredValue: string
@@ -26,120 +31,133 @@ const RANK_ROWS = [
   ['K', '#', '*', 'BS'],
 ]
 
-export default function CardKeyboard({
-  enteredValue,
-  onHandChange,
-  isDeuces = false,
-  disabled = false,
-}: CardKeyboardProps) {
-  // Own raw-input buffer — separate from the parsed noSpacesHand in the store.
-  // ParseInputHand requires the raw character stream (e.g. 'Ac2d'), not the
-  // padded/parsed store value ('AcXXXXXXXX' or 'XXXXXXXXXX').
-  // useRef so rapid taps always see the latest value (no stale-closure race).
-  const rawInputRef = useRef('')
+const CardKeyboard = forwardRef<CardKeyboardHandle, CardKeyboardProps>(
+  function CardKeyboard({ enteredValue, onHandChange, isDeuces = false, disabled = false }, ref) {
+    // Own raw-input buffer — separate from the parsed noSpacesHand in the store.
+    // useRef so rapid taps always see the latest value (no stale-closure race).
+    const rawInputRef = useRef('')
 
-  // Reset buffer when the parent clears the hand (Next Hand / fresh session).
-  useEffect(() => {
-    if (!enteredValue || enteredValue === 'XXXXXXXXXX') {
-      rawInputRef.current = ''
-    }
-  }, [enteredValue])
+    // Reset buffer when the parent clears the hand (Next Hand / fresh session).
+    useEffect(() => {
+      if (!enteredValue || enteredValue === 'XXXXXXXXXX') {
+        rawInputRef.current = ''
+      }
+    }, [enteredValue])
 
-  const handleKey = (value: string) => {
-    if (disabled) return
-    let noSpacesHand = ''
-    let dispHand = ''
-    const raw = rawInputRef.current
+    const handleKey = (value: string) => {
+      if (disabled) return
+      let noSpacesHand = ''
+      let dispHand = ''
+      const raw = rawInputRef.current
 
-    if (value === '#') {
-      let hand = ''
-      while (!hand.includes('2')) {
+      if (value === '#') {
+        let hand = ''
+        while (!hand.includes('2')) {
+          const deck = getDeck()
+          const shuffled = shuffleDeck(deck)
+          const cards = dealCards(shuffled, 5)
+          hand = cards.join('').replace(/,/g, '')
+        }
+        noSpacesHand = hand
+        dispHand = getDispHand(hand)
+        rawInputRef.current = hand
+      } else if (value === '*') {
         const deck = getDeck()
         const shuffled = shuffleDeck(deck)
         const cards = dealCards(shuffled, 5)
-        hand = cards.join('').replace(/,/g, '')
+        noSpacesHand = cards.join('').replace(/,/g, '')
+        dispHand = getDispHand(noSpacesHand)
+        rawInputRef.current = noSpacesHand
+      } else {
+        const result = ParseInputHand('keyboard', value, raw, () => {})
+        noSpacesHand = result.noSpacesHand
+        dispHand = result.dispHand
+        rawInputRef.current = noSpacesHand
       }
-      noSpacesHand = hand
-      dispHand = getDispHand(hand)
-      rawInputRef.current = hand
-    } else if (value === '*') {
-      const deck = getDeck()
-      const shuffled = shuffleDeck(deck)
-      const cards = dealCards(shuffled, 5)
-      noSpacesHand = cards.join('').replace(/,/g, '')
-      dispHand = getDispHand(noSpacesHand)
-      rawInputRef.current = noSpacesHand
-    } else {
-      const result = ParseInputHand('keyboard', value, raw, () => {})
-      noSpacesHand = result.noSpacesHand
-      dispHand = result.dispHand
-      // Store the normalized output as the new buffer, not the raw characters.
-      // Prevents suit-before-rank input (e.g. 'd2') from corrupting subsequent
-      // odd-length passthroughs — ParseInputHand normalises pairs on even-length
-      // strings, so the ref always holds rank-before-suit after each even step.
-      rawInputRef.current = noSpacesHand
+
+      if (isDeuces) {
+        noSpacesHand = noSpacesHand.replace(/2/g, 'W')
+        dispHand = dispHand.replace(/W/g, '2')
+      }
+
+      onHandChange(noSpacesHand, dispHand)
     }
 
-    if (isDeuces) {
-      noSpacesHand = noSpacesHand.replace(/2/g, 'W')
-      dispHand = dispHand.replace(/W/g, '2')
+    // Expose addToken for voice input: feeds a 2-char token through ParseInputHand
+    // (rank then suit) so rawInputRef stays in sync with keyboard-typed input.
+    useImperativeHandle(ref, () => ({
+      addToken(token: string) {
+        if (disabled || token.length !== 2) return
+        const rank = token[0]!
+        const suit = token[1]!
+        const r1 = ParseInputHand('keyboard', rank, rawInputRef.current, () => {})
+        rawInputRef.current = r1.noSpacesHand
+        const r2 = ParseInputHand('keyboard', suit, rawInputRef.current, () => {})
+        rawInputRef.current = r2.noSpacesHand
+        let noSpacesHand = r2.noSpacesHand
+        let dispHand = r2.dispHand
+        if (isDeuces) {
+          noSpacesHand = noSpacesHand.replace(/2/g, 'W')
+          dispHand = dispHand.replace(/W/g, '2')
+        }
+        onHandChange(noSpacesHand, dispHand)
+      },
+    }))
+
+    const keyLabel = (value: string) => {
+      if (value === 'BS') return gameIcons.backspace
+      if (value === '*') return gameIcons.asterisk
+      if (value === '#') return '#'
+      return value
     }
 
-    onHandChange(noSpacesHand, dispHand)
-  }
+    const keyAriaLabel = (value: string) => {
+      if (value === 'BS') return 'Backspace'
+      if (value === '*') return 'Random hand'
+      if (value === '#') return 'Random deuces hand'
+      return value
+    }
 
-  const keyLabel = (value: string) => {
-    if (value === 'BS') return gameIcons.backspace
-    if (value === '*') return gameIcons.asterisk
-    if (value === '#') return '#'
-    return value
-  }
+    const screenWidth = Dimensions.get('window').width
+    const keySize = Math.floor((screenWidth - 40) / 4)
 
-  const keyAriaLabel = (value: string) => {
-    if (value === 'BS') return 'Backspace'
-    if (value === '*') return 'Random hand'
-    if (value === '#') return 'Random deuces hand'
-    return value
-  }
-
-  const screenWidth = Dimensions.get('window').width
-  // 4 keys per row with equal spacing; key diameter fills available width
-  const keySize = Math.floor((screenWidth - 40) / 4)
-
-  return (
-    <View style={[styles.container, { backgroundColor: Colors.bgKeyboard }]}>
-      {/* Suit row */}
-      <View style={styles.row}>
-        {SUIT_ROWS.map(({ value, label, display, color }) => (
-          <Pressable
-            key={value}
-            accessibilityLabel={label}
-            onPress={() => handleKey(value)}
-            style={[styles.key, { width: keySize, height: keySize, borderRadius: keySize / 2 }]}
-          >
-            <Text style={[styles.suitText, { color }]}>{display}</Text>
-          </Pressable>
-        ))}
-      </View>
-
-      {/* Rank rows */}
-      {RANK_ROWS.map((row, rowIndex) => (
-        <View key={rowIndex} style={styles.row}>
-          {row.map((value) => (
+    return (
+      <View style={[styles.container, { backgroundColor: Colors.bgKeyboard }]}>
+        {/* Suit row */}
+        <View style={styles.row}>
+          {SUIT_ROWS.map(({ value, label, display, color }) => (
             <Pressable
               key={value}
-              accessibilityLabel={keyAriaLabel(value)}
+              accessibilityLabel={label}
               onPress={() => handleKey(value)}
               style={[styles.key, { width: keySize, height: keySize, borderRadius: keySize / 2 }]}
             >
-              <Text style={styles.keyText}>{keyLabel(value)}</Text>
+              <Text style={[styles.suitText, { color }]}>{display}</Text>
             </Pressable>
           ))}
         </View>
-      ))}
-    </View>
-  )
-}
+
+        {/* Rank rows */}
+        {RANK_ROWS.map((row, rowIndex) => (
+          <View key={rowIndex} style={styles.row}>
+            {row.map((value) => (
+              <Pressable
+                key={value}
+                accessibilityLabel={keyAriaLabel(value)}
+                onPress={() => handleKey(value)}
+                style={[styles.key, { width: keySize, height: keySize, borderRadius: keySize / 2 }]}
+              >
+                <Text style={styles.keyText}>{keyLabel(value)}</Text>
+              </Pressable>
+            ))}
+          </View>
+        ))}
+      </View>
+    )
+  }
+)
+
+export default CardKeyboard
 
 const styles = StyleSheet.create({
   container: {

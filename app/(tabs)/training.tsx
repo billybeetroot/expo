@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import {
   View, Text, Pressable, StyleSheet, SafeAreaView, Alert,
 } from 'react-native'
@@ -17,6 +17,7 @@ import StrategyLine from '@/components/game/StrategyLine'
 import AppHeader from '@/components/ui/AppHeader'
 import { Colors } from '@/constants/colors'
 import { useRouter } from 'expo-router'
+import { useVoiceControl } from '@/voice/hooks/useVoiceControl'
 
 // Row of 5 card-notation boxes shown below the card images in FG mode.
 // Each box shows rank + suit glyph (e.g. "A♣"), colour-coded by suit.
@@ -344,6 +345,29 @@ export default function TrainingScreen() {
 
   const creditLine = `CREDIT $${creditSum.toFixed(2)}   PERFECTPLAY $${bestCreditSum.toFixed(2)}   WIN $${winSum.toFixed(2)}`
 
+  // Voice control: applies hold positions from speech commands to the card display
+  const handleVoiceHold = useCallback((positions: number[]) => {
+    if (gameState !== 'After Deal') return
+    const newCardsHeld = Array(5).fill('Release')
+    const newCardHoldCss = Array(5).fill('hold_none')
+    const newCardHoldText = Array(5).fill(' ')
+    for (const pos of positions) {
+      const i = pos - 1
+      newCardsHeld[i] = 'Held'
+      newCardHoldCss[i] = 'hold_held'
+      newCardHoldText[i] = 'HELD'
+    }
+    setCardsHeld(newCardsHeld)
+    setCardHoldCss(newCardHoldCss)
+    setCardHoldText(newCardHoldText)
+  }, [gameState, setCardsHeld, setCardHoldCss, setCardHoldText])
+
+  const { isListening: voiceListening, toggle: voiceToggle } = useVoiceControl({
+    hand,
+    onHold: handleVoiceHold,
+    onDraw: handleDraw,
+  })
+
   return (
     <SafeAreaView style={styles.screen}>
       <AppHeader onMenu={() => router.push('/config')} />
@@ -369,6 +393,14 @@ export default function TrainingScreen() {
 
       {/* Control row */}
       <View style={styles.controlRow}>
+        <Pressable
+          onPress={voiceToggle}
+          style={[styles.micBtn, voiceListening && styles.micBtnActive]}
+          accessibilityLabel={voiceListening ? 'Stop voice' : 'Start voice'}
+        >
+          <Text style={styles.micIcon}>🎤</Text>
+        </Pressable>
+
         <Pressable
           onPress={() => setHandAssist(!handAssist)}
           style={[styles.assistBtn, handAssist && styles.assistBtnActive]}
@@ -447,6 +479,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     gap: 8,
+  },
+  micBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.bgKeyboard,
+    borderWidth: 1.5,
+    borderColor: Colors.tabBarBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  micBtnActive: {
+    backgroundColor: '#7a2020',
+    borderColor: '#cc3333',
+  },
+  micIcon: {
+    fontSize: 16,
   },
   assistBtn: {
     borderWidth: 1.5,

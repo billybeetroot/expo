@@ -6,7 +6,7 @@
 
 ---
 
-## Status (as of 2026-06-02)
+## Status (as of 2026-06-04)
 
 | Phase | Status | Tests | Notes |
 |---|---|---|---|
@@ -16,9 +16,9 @@
 | 3 — Live Play vertical | ✅ Complete | 15 suites / 268 tests | Running on iOS 26.5 simulator vs local Django |
 | 4 — Authentication | ✅ Complete | 17 suites / 283 tests | signUp/signIn/logout, auth screens, account tab |
 | 5 — Training (FG) | ✅ Complete | 20 suites / 314 tests | Full DEAL→hold→DRAW loop, paytable, EV table |
-| 6 — Game Configuration | 🔲 Next | — | — |
-| 7 — Voice | 🔲 | — | — |
-| 8 — Account / Payments | 🔲 | — | — |
+| 6 — Game Configuration | ✅ Complete | 22 suites / 355 tests | Cascade selectors, recent games, setup dispatch |
+| 7 — Voice | ✅ Complete | 24 suites / 397 tests | expo-speech-recognition; LP card entry + FG hold commands |
+| 8 — Account / Payments | 🔲 Next | — | — |
 | 9 — Polish | 🔲 | — | — |
 
 **Known issues to fix before Phase 9:**
@@ -27,7 +27,7 @@
 - NativeWind metro transformer disabled — needs `react-native-reanimated` to re-enable
 - `USE_LOCAL_BACKEND = true` in `lib/dispatch.ts` — must be set to `false` before production build
 
-**Completed this session (2026-06-02):**
+**Completed 2026-06-02:**
 - Phase 4: authApi.ts, firebaseAuthErrors.ts, login/signup/forgot screens, account tab auth state
 - Phase 5: applyDealResult, applyDrawResult, formatHoldMessage (31 tests); training screen with
   DEAL→hold→DRAW loop, Hand Assist EV toggle, hold outcome banner, paytable with winning row
@@ -35,7 +35,17 @@
 - Style: dark teal theme, AppHeader, CardKeyboard circular keys, StrategyLine light blue
 - Fixes: CardKeyboard raw input buffer (useRef, normalised output); direct Django dispatch
   (no np2 envelope); pre-warm anonymous Firebase auth; HOLD→HELD tap logic
-- `SafeAreaView` from `react-native` deprecated — switch to `react-native-safe-area-context`
+
+**Completed 2026-06-04:**
+- Phase 6: constants/gameData.ts (all 5 game groups, ptFromVariantPaytable); lib/previousGames.ts
+  (parse/prepend/serialize, 15 tests); config.tsx modal with cascade selectors, bet/denom pickers,
+  recent games, setup dispatch on confirm, savePreviousGames for logged-in users; 41 new tests
+- AppHeader ≡ moved to left side (was top-right, conflicted with iOS simulator overlay)
+- Phase 7: expo-speech-recognition (native iOS/Android, not AssemblyAI); applyHoldIntent.ts
+  (intentToPositions pure function, 28 tests); cardPhraseParser.ts ("ace of clubs" → "Ac", 19 tests);
+  useVoiceInput (LP card entry + deal/reset/backspace commands); useVoiceControl (FG hold intents
+  + draw, TTS echo via expo-speech, callbacksRef for stale-closure safety); CardKeyboard extended
+  with forwardRef/useImperativeHandle addToken(); 🎤 button on LP and Training control rows
 - NativeWind metro transformer disabled — needs `react-native-reanimated` to re-enable
 - Simulator network error on DEAL — expected in simulator without VPN/tunnel; test on device
 
@@ -320,18 +330,38 @@ recent games quick-switch works and persists.
 
 ### Phase 8 — Account / Membership & payments
 
+**Library: RevenueCat** (`react-native-purchases`) — handles StoreKit (iOS) and Google Play
+Billing (Android), plus server-side receipt validation and entitlement state. No custom
+backend receipt endpoint needed.
+
+**Pre-requisites (outside the code — must exist before implementation):**
+- App Store Connect: create subscription products (Monthly, Annual, 48-Hour Pass). Note:
+  the $5.00 setup fee cannot be a standalone IAP product and must be folded into pricing
+  or dropped. Apple takes 30% (15% after year-1 subscriber discount).
+- Google Play Console: create equivalent subscription products.
+- RevenueCat dashboard: create project, link App Store + Play Store products, define
+  entitlements (e.g. "premium"), export API keys.
+- Env vars: `EXPO_PUBLIC_REVENUECAT_IOS_KEY`, `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY`.
+
 **Tests-first:**
-- `lib/membership.test.ts`: map Firestore membership → plan label/status; gate logic
-  (member vs visitor).
-- `lib/pricing.test.ts`: env prices → display strings ($12.95/$99.00/$4.99/$5.00 setup).
+- `lib/membership.test.ts`: map RevenueCat `CustomerInfo.entitlements.active` → appStore
+  `isMember`/`ppPlanType`; plan label display logic.
 
-**Implementation:** `(tabs)/account.tsx` — membership status + plan. **iOS (reader app):**
-prices + `Linking.openURL('https://perfectplay.vegas/#member')`, no in-app purchase.
-**Android:** `@stripe/stripe-react-native` sheet (Monthly CC / Annual / 48-Hr) + PayPal
-(Monthly) → same Django checkout endpoints. Restore: `mergeLoginUserData` on focus.
+**Implementation:**
+- Install `react-native-purchases` + `expo-build-properties` plugin.
+- `lib/purchases.ts`: `configurePurchases(userId)` on app launch; `getOfferings()`;
+  `purchasePackage(pkg)`; `getCustomerInfo()` → `isMember`.
+- `(tabs)/account.tsx` — if member: show plan name + expiry. If not member: show
+  offering packages (Monthly / Annual / 48-Hr) with prices from RevenueCat offering,
+  each with a purchase button. On purchase: `purchasePackage` → update appStore.
+- `AppState` listener on account screen: re-fetch `getCustomerInfo()` on foreground
+  return (handles the case where user purchased via a different device or the web app).
+- Restore purchases button: `Purchases.restorePurchases()`.
+- Android: same code path — RevenueCat abstracts Play Billing identically to StoreKit.
 
-**DoD:** Device — iOS opens web purchase; Android renders native sheet; membership reflects
-after purchase. (Platform-split via `Platform.OS`.)
+**DoD:** Sandbox — iOS: tap Monthly → StoreKit sandbox sheet → purchase completes →
+account screen shows "Member". Android: same via Play Billing test account. Restore:
+existing subscriber taps Restore → membership reflected without re-purchasing.
 
 ---
 
@@ -351,7 +381,7 @@ suppression in production, accessibility labels on cards/keys.
 - Training: DEAL→hold pair→DRAW→correct banner + credit update.
 - Voice LP: speak 5 cards → hand populates → "deal".
 - Voice FG (flagged): "hold the pair" → correct HELD.
-- Payments: iOS web link; Android native sheet.
+- Payments: iOS sandbox purchase → entitlement active; Android Play Billing test → entitlement active; Restore purchases works.
 
 ---
 
@@ -362,7 +392,9 @@ suppression in production, accessibility labels on cards/keys.
 | **`/api/assemblyai-token` may not exist on Django** | Voice blocked | Verify early (Phase 0 recon); add endpoint server-side if missing |
 | **`expo-audio` PCM16 frame streaming** (no AudioWorklet equiv) | LP/FG voice | Prototype capture→WS in isolation before Phase 7; fall back to chunked file upload if streaming unviable |
 | **Per-action decode contract** (§3.1) | Wrong results silently | Fixed in Phase 0 with explicit tests |
-| **iOS reader-app payment compliance** | App Store rejection | Already chosen reader model; no IAP code on iOS |
+| **App Store Connect products not created** | Phase 8 blocked | Create products + RevenueCat project before starting Phase 8 code |
+| **RevenueCat sandbox latency** | Slow test loop | Use StoreKit Configuration file for local sandbox testing (no network needed) |
+| **$5 setup fee can't be IAP** | Pricing change required | Fold into subscription prices or remove before App Store submission |
 | **Firebase anon-auth + AsyncStorage persistence on RN** | Dispatch auth fails | `initializeAuth` with RN persistence already wired; test on device early |
 | **Suit glyphs / card PNG rendering in RN** | Visual breakage | Verify in Phase 1–2 on device |
 | **Engine response shape drift vs np2** | Mapping bugs | Mappers are pure + tested against real captured payloads |

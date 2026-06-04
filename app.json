@@ -25,7 +25,14 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "PerfectPLAY uses the microphone to let you enter cards and hold commands by voice.",
+          "speechRecognitionPermission": "PerfectPLAY uses speech recognition to let you enter cards and hold commands by voice."
+        }
+      ]
     ],
     "scheme": "perfectplay"
   }
