@@ -160,6 +160,28 @@ group/variant/paytable data was consolidated into a single typed TypeScript file
 (`constants/gameData.ts`) with a `ptFromVariantPaytable()` helper. Simpler to import, fully
 type-checked, and covers all 5 game groups with their full paytable lists.
 
+**Build toolchain: EAS Build over Xcode.** The original plan assumed `expo run:ios` /
+`expo run:android` for local development, which uses Xcode as the native build tool. This
+was replaced with **Expo EAS Build** + `expo-dev-client` for two reasons:
+
+1. Expo managed workflow is architecturally designed around EAS. Running `expo run:ios`
+   requires Xcode as a build tool (not just a simulator host), and native package management
+   becomes the developer's responsibility. EAS keeps all of that in the cloud.
+2. From Phase 7 onward, native modules (`expo-speech-recognition`, `react-native-purchases`)
+   are not supported in standard Expo Go. A custom development client is required regardless —
+   EAS is the clean path to get one without touching Xcode project files.
+
+The practical trade-off is build queue time (10–20 minutes on the free EAS tier). This is
+acceptable because development client rebuilds are rare — only needed when native packages
+are added or updated, not on every code change. Daily development is `yarn start` + hot
+reload in the installed dev client, which has no queue.
+
+Local EAS builds (`eas build --local`) are available as a middle ground if queue times
+become a problem — they run the build on the local machine using installed tools but without
+requiring Xcode project management.
+
+The Xcode simulator is still used for device simulation; it is not used as a build tool.
+
 ---
 
 ## What I deliberately did NOT do
