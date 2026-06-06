@@ -18,7 +18,8 @@
 | 5 — Training (FG) | ✅ Complete | 20 suites / 314 tests | Full DEAL→hold→DRAW loop, paytable, EV table |
 | 6 — Game Configuration | ✅ Complete | 22 suites / 355 tests | Cascade selectors, recent games, setup dispatch |
 | 7 — Voice | ✅ Complete | 24 suites / 397 tests | expo-speech-recognition; LP card entry + FG hold commands |
-| 8 — Account / Payments | 🔲 Next | — | — |
+| 8a — Payments (Android) | 🔲 Next | — | Google Play Billing via RevenueCat |
+| 8b — Payments (iOS) | 🔲 Deferred | — | Apple IAP via RevenueCat; needs Developer Program enrollment |
 | 9 — Polish | 🔲 | — | — |
 
 **Known issues to fix before Phase 9:**
@@ -333,40 +334,52 @@ FG: "hold the pair" marks correct cards; "draw" resolves; TTS confirms hold alou
 
 ---
 
-### Phase 8 — Account / Membership & payments
+### Phase 8a — Account / Membership (Android)
 
-**Library: RevenueCat** (`react-native-purchases`) — handles StoreKit (iOS) and Google Play
-Billing (Android), plus server-side receipt validation and entitlement state. No custom
-backend receipt endpoint needed.
+> iOS payments are deferred to Phase 8b. On iOS in this phase the account screen shows
+> membership status (for users who subscribed via the web app) but no purchase UI.
 
-**Pre-requisites (outside the code — must exist before implementation):**
-- App Store Connect: create subscription products (Monthly, Annual, 48-Hour Pass). Note:
-  the $5.00 setup fee cannot be a standalone IAP product and must be folded into pricing
-  or dropped. Apple takes 30% (15% after year-1 subscriber discount).
-- Google Play Console: create equivalent subscription products.
-- RevenueCat dashboard: create project, link App Store + Play Store products, define
-  entitlements (e.g. "premium"), export API keys.
-- Env vars: `EXPO_PUBLIC_REVENUECAT_IOS_KEY`, `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY`.
+**Pre-requisites:** Complete Part A of `docs/PAYMENT_SETUP_GUIDE.md` checklist —
+Google Play Console products, RevenueCat Android app, entitlement, offering, webhook,
+np2 `/api/revenuecat-webhook` endpoint, `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` env var.
 
 **Tests-first:**
 - `lib/membership.test.ts`: map RevenueCat `CustomerInfo.entitlements.active` → appStore
   `isMember`/`ppPlanType`; plan label display logic.
 
 **Implementation:**
-- `yarn add react-native-purchases` then `yarn build:sim:ios` (native package — EAS rebuild required).
-- `lib/purchases.ts`: `configurePurchases(userId)` on app launch; `getOfferings()`;
+- `yarn add react-native-purchases` then `yarn build:sim:android` (native package — EAS rebuild required).
+- `lib/purchases.ts`: `Purchases.configure(androidKey)` on app launch; `getOfferings()`;
   `purchasePackage(pkg)`; `getCustomerInfo()` → `isMember`.
-- `(tabs)/account.tsx` — if member: show plan name + expiry. If not member: show
-  offering packages (Monthly / Annual / 48-Hr) with prices from RevenueCat offering,
-  each with a purchase button. On purchase: `purchasePackage` → update appStore.
-- `AppState` listener on account screen: re-fetch `getCustomerInfo()` on foreground
-  return (handles the case where user purchased via a different device or the web app).
-- Restore purchases button: `Purchases.restorePurchases()`.
-- Android: same code path — RevenueCat abstracts Play Billing identically to StoreKit.
+- `(tabs)/account.tsx`:
+  - All platforms: if member → show plan name + expiry + Restore button.
+  - Android: if not member → show offering packages (Monthly / Annual / 48-Hr) with prices
+    from RevenueCat offering, each with a purchase button.
+  - iOS (Phase 8a): if not member → show plan info only, no purchase UI yet.
+- `AppState` listener: re-fetch `getCustomerInfo()` on foreground return.
+- Restore purchases: `Purchases.restorePurchases()`.
 
-**DoD:** Sandbox — iOS: tap Monthly → StoreKit sandbox sheet → purchase completes →
-account screen shows "Member". Android: same via Play Billing test account. Restore:
-existing subscriber taps Restore → membership reflected without re-purchasing.
+**DoD:** Android sandbox — tap Monthly → Play Billing test sheet → purchase completes →
+account screen shows "Member". Restore: existing subscriber → membership reflected.
+
+---
+
+### Phase 8b — Payments (iOS, Deferred)
+
+> Blocked on Apple Developer Program enrollment ($99/yr). Begin when enrollment is active.
+
+**Pre-requisites:** Complete Part B of `docs/PAYMENT_SETUP_GUIDE.md` checklist —
+App Store Connect products, RevenueCat iOS app added to existing project,
+`EXPO_PUBLIC_REVENUECAT_IOS_KEY` env var.
+
+**Implementation:**
+- Add `EXPO_PUBLIC_REVENUECAT_IOS_KEY` to env; update `lib/purchases.ts` to pass the
+  correct key per platform (`Platform.OS`).
+- `yarn build:sim:ios` to rebuild dev client with both keys configured.
+- Enable iOS purchase UI in account screen (same packages, same flow as Android).
+
+**DoD:** iOS sandbox — tap Monthly → StoreKit sandbox sheet → purchase completes →
+account screen shows "Member". Restore works. RevenueCat webhook updates Firestore.
 
 ---
 
@@ -397,7 +410,8 @@ suppression in production, accessibility labels on cards/keys.
 | **Per-action decode contract** (§3.1) | Wrong results silently | Fixed in Phase 0 with explicit tests |
 | **EAS build queue time** | Slow native rebuild loop | Rebuilds rare (native package changes only); free tier ~15 min; paid tier faster. `eas build --local` as fallback |
 | **EAS project ID not yet initialised** | First build blocked | Run `eas login && eas init` before Phase 8 (see `docs/EAS_SETUP_GUIDE.md`) |
-| **App Store Connect products not created** | Phase 8 blocked | Complete `docs/PAYMENT_SETUP_GUIDE.md` checklist before starting Phase 8 code |
+| **Google Play products not created** | Phase 8a blocked | Complete Part A of `docs/PAYMENT_SETUP_GUIDE.md` before starting Phase 8a code |
+| **Apple Developer Program not enrolled** | Phase 8b blocked | Deferred by design — complete enrollment when ready, then work Part B of payment guide |
 | **RevenueCat sandbox latency** | Slow test loop | Use StoreKit Configuration file for local sandbox testing (no network needed) |
 | **$5 setup fee can't be IAP** | Pricing change required | Not charged to native app subscribers — already documented in SPEC |
 | **Firebase anon-auth + AsyncStorage persistence on RN** | Dispatch auth fails | `initializeAuth` with RN persistence already wired; test on device early |

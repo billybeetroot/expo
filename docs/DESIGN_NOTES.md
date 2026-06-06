@@ -134,6 +134,13 @@ non-members on the web app.
 **$5 setup fee**: Apple IAP cannot represent a setup fee alongside a recurring subscription.
 This charge is dropped for native app subscribers.
 
+**Delivery split — Android first, iOS deferred**: Apple IAP requires Apple Developer Program
+enrollment ($99/yr) which was not in place when Phase 8 was scoped. Rather than blocking on
+enrollment, payments are split into Phase 8a (Android, unblocked) and Phase 8b (iOS, starts
+when enrollment is active). This also makes each deliverable more manageable. The RevenueCat
+SDK and `lib/purchases.ts` are written once and work for both platforms — Phase 8b is
+primarily store setup and enabling the iOS purchase UI, not a separate codebase.
+
 ---
 
 ## Judgement calls

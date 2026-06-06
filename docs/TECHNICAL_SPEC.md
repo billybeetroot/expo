@@ -209,26 +209,32 @@ CONFIRM: `setup` dispatch → decode → write `displayPaytable`/`paytable`/`val
 
 ---
 
-## Payments (Phase 8 — planned)
+## Payments
 
-**Library:** RevenueCat (`react-native-purchases`). Abstracts StoreKit (iOS) and Google Play Billing (Android) behind one API. Handles receipt validation server-side — no custom backend endpoint needed for the native app itself.
+**Library:** RevenueCat (`react-native-purchases`). Abstracts Google Play Billing (Android)
+and StoreKit (iOS) behind one API. Handles receipt validation server-side.
 
-**Pre-requisites before Phase 8 code:**
-- App Store Connect: Monthly, Annual, 48-Hour Pass subscription products
-- Google Play Console: same products mirrored
-- RevenueCat dashboard: project + entitlements + API keys
-- np2: new `/api/revenuecat-webhook` endpoint to write Firestore membership on IAP purchase
-- Env vars: `EXPO_PUBLIC_REVENUECAT_IOS_KEY`, `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY`
-- See `docs/PAYMENT_SETUP_GUIDE.md` for step-by-step store and RevenueCat configuration.
+Delivered in two phases:
 
-**Native app implementation:**
-- `yarn add react-native-purchases` then `yarn build:sim:ios` (native package — requires EAS rebuild)
-- `lib/purchases.ts`: `Purchases.configure()`, `getOfferings()`, `purchasePackage()`, `getCustomerInfo()`
-- Entitlement check: `customerInfo.entitlements.active['premium']`
-- `AppState` listener on account screen: re-fetch `getCustomerInfo()` on foreground return
-- Restore purchases: `Purchases.restorePurchases()`
+**Phase 8a — Android (next):**
+- Pre-requisites: Google Play products, RevenueCat Android app, `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY`.
+  See Part A of `docs/PAYMENT_SETUP_GUIDE.md`.
+- `yarn add react-native-purchases` then `yarn build:sim:android` (EAS rebuild required).
+- `lib/purchases.ts`: `Purchases.configure(androidKey)`, `getOfferings()`, `purchasePackage()`, `getCustomerInfo()`.
+- Entitlement check: `customerInfo.entitlements.active['premium']`.
+- `AppState` listener on account screen: re-fetch on foreground return.
+- iOS account screen in this phase: shows membership status only, no purchase UI.
+
+**Phase 8b — iOS (deferred, pending Apple Developer Program enrollment):**
+- Pre-requisites: App Store Connect products, RevenueCat iOS app, `EXPO_PUBLIC_REVENUECAT_IOS_KEY`.
+  See Part B of `docs/PAYMENT_SETUP_GUIDE.md`.
+- Update `lib/purchases.ts` to pass the correct key per `Platform.OS`.
+- Enable iOS purchase UI in account screen.
 
 **$5 setup fee:** Not representable as an IAP product. Not charged to native app subscribers.
+
+**np2 webhook:** `/api/revenuecat-webhook` needed in np2 to write Firestore membership state
+on IAP purchase (same fields as the Stripe webhook). Required before Phase 8a goes live.
 
 ---
 
