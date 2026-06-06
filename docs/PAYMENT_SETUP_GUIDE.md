@@ -6,6 +6,24 @@ At the end, record all the IDs and keys in one place — the implementation need
 
 ---
 
+## Pre-requisite: Apple Developer Program enrollment
+
+A standard Apple ID is **not sufficient** for any step in this guide. You must be enrolled
+in the **Apple Developer Program** ($99 USD/year) before proceeding.
+
+Enrollment grants access to:
+- App Store Connect (where products, subscriptions, and test accounts are managed)
+- Code signing certificates and provisioning profiles (required for all device builds)
+- StoreKit sandbox testing
+- App Store submission
+
+**Enroll here:** [developer.apple.com/programs/enroll](https://developer.apple.com/programs/enroll/)
+
+Enrollment is reviewed by Apple and typically activates within 24–48 hours. Complete it
+before starting any other step in this guide.
+
+---
+
 ## Overview
 
 Three products to create on both platforms:
@@ -30,8 +48,13 @@ Three products to create on both platforms:
 
 ### 1.1 Confirm your app exists
 
-1. Go to [App Store Connect](https://appstoreconnect.apple.com) → My Apps.
-2. Confirm an app with bundle ID `com.perfectplay.vegas` exists. If not, create it:
+> Requires Apple Developer Program enrollment (see Pre-requisite above). App Store Connect
+> will not be accessible with a standard Apple ID.
+
+1. Go to [App Store Connect](https://appstoreconnect.apple.com) and sign in with your
+   **developer** Apple ID (the one enrolled in the Developer Program).
+2. Go to My Apps.
+3. Confirm an app with bundle ID `com.perfectplay.vegas` exists. If not, create it:
    - Platform: iOS
    - Bundle ID: `com.perfectplay.vegas`
    - Name: PerfectPLAY
